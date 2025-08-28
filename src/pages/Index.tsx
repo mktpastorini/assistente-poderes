@@ -13,6 +13,7 @@ interface Settings {
   ai_model: string;
   voice_model: "browser" | "openai-tts" | "gemini-tts";
   openai_api_key: string | null;
+  openai_tts_voice: string | null;
   conversation_memory_length: number;
   activation_phrase: string;
 }
@@ -44,6 +45,7 @@ const Index = () => {
               ai_model: data.ai_model || "gpt-4o-mini",
               voice_model: data.voice_model || "browser",
               openai_api_key: data.openai_api_key || "",
+              openai_tts_voice: data.openai_tts_voice || "alloy",
               conversation_memory_length: data.conversation_memory_length ?? 5,
               activation_phrase: data.activation_phrase || "ativar",
             });
@@ -81,7 +83,8 @@ const Index = () => {
           model={settings.ai_model}
           conversationMemoryLength={settings.conversation_memory_length}
           voiceModel={settings.voice_model}
-          activationPhrase={settings.activation_phrase} // Passando prop nova
+          openaiTtsVoice={settings.openai_tts_voice || "alloy"} // Passando voz selecionada
+          activationPhrase={settings.activation_phrase}
         />
       </div>
       <MadeWithDyad />
