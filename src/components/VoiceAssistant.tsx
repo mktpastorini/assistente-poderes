@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Volume2, Mic, StopCircle, Play } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
@@ -24,7 +24,6 @@ interface Message {
   content: string;
 }
 
-const OPENAI_CHAT_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_TTS_API_URL = "https://api.openai.com/v1/audio/speech";
 
 const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
@@ -325,6 +324,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const startAssistant = () => {
     setAssistantStarted(true);
     setActivated(false);
+  };
+
+  // Função placeholder para processar input do usuário (você pode implementar a lógica de chat aqui)
+  const processUserInput = (input: string) => {
+    setAiResponse("Processando: " + input);
+    // Aqui você pode chamar a API OpenAI chat completions e atualizar messageHistory etc.
   };
 
   return (

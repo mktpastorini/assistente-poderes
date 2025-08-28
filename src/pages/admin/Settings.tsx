@@ -51,12 +51,26 @@ const defaultValues: SettingsFormData = {
   activation_phrase: "ativar",
 };
 
+// Lista oficial de vozes OpenAI TTS (modelo tts-1) conforme documentação atual
 const OPENAI_TTS_VOICES = [
-  { value: "alloy", label: "Alloy" },
-  { value: "standard", label: "Standard" },
-  { value: "female-1", label: "Female 1" },
-  { value: "male-1", label: "Male 1" },
-  // Adicione mais vozes conforme necessário
+  { value: "alloy", label: "Alloy (padrão)" },
+  { value: "antoni", label: "Antoni (masculino, inglês)" },
+  { value: "bella", label: "Bella (feminino, inglês)" },
+  { value: "carmit", label: "Carmit (feminino, hebraico)" },
+  { value: "dario", label: "Dario (masculino, italiano)" },
+  { value: "ellen", label: "Ellen (feminino, inglês)" },
+  { value: "gabrielle", label: "Gabrielle (feminino, francês)" },
+  { value: "josef", label: "Josef (masculino, alemão)" },
+  { value: "karl", label: "Karl (masculino, alemão)" },
+  { value: "laura", label: "Laura (feminino, espanhol)" },
+  { value: "maria", label: "Maria (feminino, espanhol)" },
+  { value: "matthew", label: "Matthew (masculino, inglês)" },
+  { value: "natalie", label: "Natalie (feminino, inglês)" },
+  { value: "pierre", label: "Pierre (masculino, francês)" },
+  { value: "ricardo", label: "Ricardo (masculino, português)" },
+  { value: "sara", label: "Sara (feminino, inglês)" },
+  { value: "sophie", label: "Sophie (feminino, francês)" },
+  { value: "xiaoyan", label: "Xiaoyan (feminino, chinês)" },
 ];
 
 const SettingsPage: React.FC = () => {
