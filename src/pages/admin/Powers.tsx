@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Edit } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Play } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -59,6 +59,8 @@ const PowersPage: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loadingPowers, setLoadingPowers] = useState(true);
   const [editingPowerId, setEditingPowerId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<any | null>(null);
+  const [testingPower, setTestingPower] = useState(false);
 
   const {
     register,
@@ -66,6 +68,7 @@ const PowersPage: React.FC = () => {
     reset,
     setValue,
     watch,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<PowerFormData>({
     resolver: zodResolver(powerSchema),
@@ -163,6 +166,7 @@ const PowersPage: React.FC = () => {
         showSuccess(`Poder ${editingPowerId ? 'atualizado' : 'adicionado'} com sucesso!`);
         reset();
         setEditingPowerId(null);
+        setTestResult(null); // Clear test result on save
         // Recarregar poderes
         const { data: updatedPowers, error: fetchError } = await supabase
           .from('powers')
@@ -188,6 +192,7 @@ const PowersPage: React.FC = () => {
     setValue("headers", JSON.stringify(power.headers || {}, null, 2));
     setValue("body", JSON.stringify(power.body || {}, null, 2));
     setValue("api_key_id", power.api_key_id);
+    setTestResult(null); // Clear test result when editing a new power
   };
 
   const onDelete = async (id: string) => {
@@ -204,6 +209,72 @@ const PowersPage: React.FC = () => {
     } else {
       showSuccess("Poder excluído com sucesso!");
       setPowers(powers.filter(p => p.id !== id));
+      if (editingPowerId === id) {
+        reset();
+        setEditingPowerId(null);
+        setTestResult(null);
+      }
+    }
+  };
+
+  const handleTestPower = async () => {
+    setTestingPower(true);
+    setTestResult(null);
+    const formData = getValues();
+
+    if (!formData.url) {
+      showError("URL do Endpoint é obrigatória para testar.");
+      setTestingPower(false);
+      return;
+    }
+
+    try {
+      const parsedHeaders = formData.headers ? JSON.parse(formData.headers) : {};
+      const parsedBody = (formData.body && (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH"))
+        ? JSON.parse(formData.body)
+        : undefined;
+
+      // IMPORTANT: API keys are NOT decrypted client-side for security reasons.
+      // If your headers/body contain {{API_KEY}} placeholders, they will not be resolved here.
+      // For secure testing with API keys, an Edge Function is recommended.
+
+      const fetchOptions: RequestInit = {
+        method: formData.method,
+        headers: parsedHeaders,
+      };
+
+      if (parsedBody) {
+        fetchOptions.body = JSON.stringify(parsedBody);
+      }
+
+      const response = await fetch(formData.url, fetchOptions);
+      const responseText = await response.text(); // Get raw text first to handle non-JSON responses
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch {
+        responseData = responseText; // If not JSON, keep as text
+      }
+
+      setTestResult({
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        data: responseData,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+      showSuccess("Teste de poder concluído!");
+
+    } catch (e: any) {
+      showError(`Erro ao testar poder: ${e.message}`);
+      setTestResult({
+        error: e.message,
+        details: e.stack,
+      });
+      console.error("Erro ao testar poder:", e);
+    } finally {
+      setTestingPower(false);
     }
   };
 
@@ -268,13 +339,13 @@ const PowersPage: React.FC = () => {
               <Label htmlFor="power-api-key">Chave de API para Autenticação (Opcional)</Label>
               <Select
                 onValueChange={(value) => setValue("api_key_id", value === "none" ? null : value)}
-                value={watch("api_key_id") || "none"} // Se null, exibe "none"
+                value={watch("api_key_id") || "none"}
               >
                 <SelectTrigger id="power-api-key">
                   <SelectValue placeholder="Nenhuma chave de API" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem> {/* Valor alterado para "none" */}
+                  <SelectItem value="none">Nenhuma</SelectItem>
                   {apiKeys.map((key) => (
                     <SelectItem key={key.id} value={key.id}>
                       {key.label} ({key.provider})
@@ -284,17 +355,66 @@ const PowersPage: React.FC = () => {
               </Select>
               {errors.api_key_id && <p className="text-destructive text-sm mt-1">{errors.api_key_id.message}</p>}
             </div>
-            <Button type="submit" disabled={isSubmitting}>
-              <PlusCircle className="mr-2 h-4 w-4" /> {editingPowerId ? "Salvar Alterações" : "Adicionar Poder"}
-            </Button>
-            {editingPowerId && (
-              <Button type="button" variant="outline" onClick={() => { reset(); setEditingPowerId(null); }} className="ml-2">
-                Cancelar Edição
+            <div className="flex space-x-2">
+              <Button type="submit" disabled={isSubmitting}>
+                <PlusCircle className="mr-2 h-4 w-4" /> {editingPowerId ? "Salvar Alterações" : "Adicionar Poder"}
               </Button>
-            )}
+              <Button type="button" onClick={handleTestPower} disabled={testingPower || isSubmitting} variant="secondary">
+                <Play className="mr-2 h-4 w-4" /> {testingPower ? "Testando..." : "Testar Poder"}
+              </Button>
+              {editingPowerId && (
+                <Button type="button" variant="outline" onClick={() => { reset(); setEditingPowerId(null); setTestResult(null); }} className="ml-2">
+                  Cancelar Edição
+                </Button>
+              )}
+            </div>
           </form>
         </CardContent>
       </Card>
+
+      {testResult && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Resultado do Teste</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {testResult.error ? (
+              <div className="text-destructive">
+                <p className="font-semibold">Erro:</p>
+                <pre className="bg-red-100 dark:bg-red-900 p-2 rounded-md text-sm overflow-auto">
+                  {testResult.error}
+                </pre>
+                {testResult.details && (
+                  <>
+                    <p className="font-semibold mt-2">Detalhes:</p>
+                    <pre className="bg-red-100 dark:bg-red-900 p-2 rounded-md text-sm overflow-auto">
+                      {testResult.details}
+                    </pre>
+                  </>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className={testResult.ok ? "text-green-600" : "text-orange-600"}>
+                  Status: {testResult.status} {testResult.statusText} ({testResult.ok ? "OK" : "Erro"})
+                </p>
+                <p className="font-semibold mt-2">Headers da Resposta:</p>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded-md text-sm overflow-auto">
+                  {JSON.stringify(testResult.headers, null, 2)}
+                </pre>
+                <p className="font-semibold mt-2">Dados da Resposta:</p>
+                <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded-md text-sm overflow-auto">
+                  {typeof testResult.data === 'object' ? JSON.stringify(testResult.data, null, 2) : testResult.data}
+                </pre>
+              </div>
+            )}
+            <p className="text-sm text-muted-foreground mt-4">
+              Nota: Chaves de API criptografadas não são descriptografadas no navegador para testes.
+              Para testar poderes que dependem de chaves de API seguras, considere usar um Edge Function.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
