@@ -64,6 +64,9 @@ const SettingsPage: React.FC = () => {
     defaultValues,
   });
 
+  // Controlar valor do slider manualmente
+  const voiceSensitivity = watch("voice_sensitivity");
+
   useEffect(() => {
     if (!loading && workspace && workspace.id) {
       setLoadingSettings(true);
@@ -208,15 +211,18 @@ const SettingsPage: React.FC = () => {
         </CardHeader>
         <CardContent>
           <Slider
-            {...register("voice_sensitivity")}
+            value={voiceSensitivity ?? 50}
+            onValueChange={(value) => setValue("voice_sensitivity", value)}
             min={0}
             max={100}
             step={1}
-            defaultValue={50}
           />
           <p className="text-sm text-muted-foreground mt-1">
             Ajuste a sensibilidade do microfone (0 a 100)
           </p>
+          {errors.voice_sensitivity && (
+            <p className="text-destructive text-sm mt-1">{errors.voice_sensitivity.message}</p>
+          )}
         </CardContent>
       </Card>
 
