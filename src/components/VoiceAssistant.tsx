@@ -15,7 +15,7 @@ interface VoiceAssistantProps {
   model?: string;
   conversationMemoryLength: number;
   voiceModel: "browser" | "openai-tts" | "gemini-tts";
-  activationPhrase: string; // Nova prop
+  activationPhrase: string;
 }
 
 const OPENAI_CHAT_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -44,7 +44,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [assistantStarted, setAssistantStarted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
-  const [activated, setActivated] = useState(false); // Se a palavra de ativação foi ouvida
+  const [activated, setActivated] = useState(false);
 
   const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -87,13 +87,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         }
 
         if (!activated) {
-          // Verifica se a palavra/frase de ativação foi dita
           if (currentTranscript.includes(activationPhrase.toLowerCase())) {
             setActivated(true);
             speak("Assistente ativado. Pode falar.");
-          } else {
-            // Ainda aguardando ativação, não processa
-            return;
           }
         } else {
           stopListening();
@@ -103,6 +99,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
+        // Reiniciar escuta automaticamente se assistente ativo e não falando
         if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
           startListening();
         }
@@ -290,7 +287,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   const startAssistant = () => {
     setAssistantStarted(true);
-    setActivated(false); // Resetar ativação ao iniciar assistente
+    setActivated(false);
   };
 
   const fetchMessageHistory = async (currentConversationId: string, limit: number) => {
@@ -441,7 +438,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         </Button>
       ) : (
         <div className="flex flex-col items-center space-y-2">
-          <div className="text-center text-sm text-yellow-300">
+          <div className="text-center text-yellow-300 text-sm">
             {activated ? "Assistente ativado. Pode falar." : `Diga "${activationPhrase}" para ativar o assistente.`}
           </div>
           <div className="flex space-x-4">
