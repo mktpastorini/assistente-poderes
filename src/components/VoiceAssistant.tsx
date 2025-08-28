@@ -101,7 +101,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
             speak("Assistente ativado. Pode falar.");
           }
         } else {
-          stopListening();
+          // Garantir que o reconhecimento pare antes de processar input
+          if (recognitionRef.current && isRecognitionActive.current) {
+            recognitionRef.current.stop();
+            isRecognitionActive.current = false;
+            setIsListening(false);
+          }
           processUserInput(currentTranscript);
         }
       };
@@ -336,68 +341,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setAssistantStarted(true);
     setActivated(false);
     console.log("[VoiceAssistant] Assistente iniciado");
-  };
-
-  // Função para enviar input do usuário para OpenAI Chat Completions e processar resposta
-  const processUserInput = async (input: string) => {
-    if (!openAiApiKey) {
-      showError("Chave API OpenAI não configurada.");
-      return;
-    }
-
-    setAiResponse("Processando...");
-    console.log("[VoiceAssistant] Processando input do usuário:", input);
-
-    // Montar mensagens para enviar, incluindo sistema, assistente e histórico limitado
-    const messages: Message[] = [
-      { role: "system", content: systemPrompt },
-      { role: "assistant", content: assistantPrompt },
-      ...messageHistory.slice(-conversationMemoryLength),
-      { role: "user", content: input },
-    ];
-
-    try {
-      const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${openAiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 1000,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        showError(`Erro OpenAI: ${errorData.error?.message || response.statusText}`);
-        setAiResponse("");
-        return;
-      }
-
-      const data = await response.json();
-      const assistantMessage = data.choices?.[0]?.message?.content || "";
-      console.log("[VoiceAssistant] Resposta da IA:", assistantMessage);
-
-      setAiResponse(assistantMessage);
-
-      // Atualizar histórico de mensagens
-      setMessageHistory((prev) => [
-        ...prev,
-        { role: "user", content: input },
-        { role: "assistant", content: assistantMessage },
-      ]);
-
-      // Falar a resposta da IA
-      await speak(assistantMessage);
-    } catch (error) {
-      showError("Erro ao comunicar com a API OpenAI.");
-      setAiResponse("");
-      console.error("[VoiceAssistant] Erro na comunicação com a API OpenAI:", error);
-    }
   };
 
   return (
