@@ -51,12 +51,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   // Função para verificar permissão do microfone
   const checkMicrophonePermission = async (): Promise<boolean> => {
-    if (!navigator.permissions) return true; // Se não suportar API Permissions, assume true
+    if (!navigator.permissions) return true;
     try {
       const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
       return status.state === "granted";
     } catch {
-      return true; // Se erro, assume true para tentar iniciar
+      return true;
     }
   };
 
@@ -120,20 +120,42 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     };
   }, [assistantStarted]);
 
-  // Iniciar escuta automaticamente ao iniciar assistente
+  // Criar conversa automaticamente quando assistente iniciar e conversationId for null
   useEffect(() => {
-    if (assistantStarted) {
+    const createConversation = async () => {
+      if (assistantStarted && !conversationId && workspace?.id) {
+        const { data, error } = await supabase
+          .from('conversations')
+          .insert({ workspace_id: workspace.id, channel: 'web', status: 'active' })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error("Erro ao criar conversa:", error);
+          showError("Erro ao iniciar nova conversa.");
+          setConversationId(null);
+        } else {
+          setConversationId(data.id);
+          setMessageHistory([]);
+        }
+      }
+    };
+    createConversation();
+  }, [assistantStarted, conversationId, workspace]);
+
+  // Iniciar escuta automaticamente após conversa criada e permissão do mic
+  useEffect(() => {
+    if (assistantStarted && conversationId) {
       (async () => {
         const micPermission = await checkMicrophonePermission();
         if (micPermission) {
           startListening();
         } else {
-          // Se sem permissão, falar mensagem pedindo permissão
           speak("Por favor, habilite seu microfone para conversar comigo.");
         }
       })();
     }
-  }, [assistantStarted]);
+  }, [assistantStarted, conversationId]);
 
   const stopSpeaking = () => {
     if (synthRef.current && synthRef.current.speaking) {
@@ -232,7 +254,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
-      if (isStartingRecognition.current) return; // Evita start concorrente
+      if (isStartingRecognition.current) return;
       isStartingRecognition.current = true;
       setTranscript("");
       setAiResponse("");
@@ -255,29 +277,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setIsListening(false);
   };
 
-  const startAssistant = async () => {
-    if (!workspace?.id) {
-      showError("Workspace não encontrado para iniciar o assistente.");
-      return;
-    }
-
+  const startAssistant = () => {
     setAssistantStarted(true);
-    speak(welcomeMessage);
-
-    const { data, error } = await supabase
-      .from('conversations')
-      .insert({ workspace_id: workspace.id, channel: 'web', status: 'active' })
-      .select('id')
-      .single();
-
-    if (error) {
-      console.error("Erro ao criar conversa:", error);
-      showError("Erro ao iniciar nova conversa.");
-      setConversationId(null);
-    } else {
-      setConversationId(data.id);
-      setMessageHistory([]);
-    }
   };
 
   const fetchMessageHistory = async (currentConversationId: string, limit: number) => {
