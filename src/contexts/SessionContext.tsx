@@ -38,7 +38,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
   const lastUserIdRef = useRef<string | null>(null);
 
-  // Effect para lidar com a sessão inicial e mudanças de estado de autenticação
   useEffect(() => {
     const loadSessionAndUser = async () => {
       const { data: { session: initialSession }, error } = await supabase.auth.getSession();
@@ -54,7 +53,6 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
       setSession(currentSession);
-      // Atualiza user somente se mudou para evitar loop
       if (currentSession?.user?.id !== lastUserIdRef.current) {
         setUser(currentSession?.user || null);
       }
@@ -63,12 +61,10 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
     return () => subscription.unsubscribe();
   }, []);
 
-  // Effect para buscar perfil e workspace quando o usuário muda
   useEffect(() => {
     const fetchUserData = async () => {
-      if (user) {
+      if (user && user.id) {
         if (user.id === lastUserIdRef.current) {
-          // Já carregamos dados para este usuário, evitar fetch repetido
           setInitialLoadComplete(true);
           return;
         }

@@ -48,6 +48,18 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const isSpeakingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    if (voiceModel === "gemini-tts") {
+      showError("Gemini TTS ainda não está implementado.");
+    }
+  }, [voiceModel]);
+
+  useEffect(() => {
+    if (model === "gemini-pro") {
+      showError("Modelo Gemini IA ainda não está implementado. Use OpenAI.");
+    }
+  }, [model]);
+
   // Initialize Speech Recognition and Synthesis
   useEffect(() => {
     const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -73,13 +85,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           return;
         }
 
-        stopListening(); // Parar para processar e falar
+        stopListening();
         processUserInput(currentTranscript);
       };
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
-        // Reiniciar escuta somente se assistente ativo e não estiver falando
         if (assistantStarted && !isSpeakingRef.current) {
           recognitionRef.current?.start();
         }
@@ -110,7 +121,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     };
   }, [assistantStarted]);
 
-  // Função para parar fala (navegador e áudio)
   const stopSpeaking = () => {
     if (synthRef.current && synthRef.current.speaking) {
       synthRef.current.cancel();
@@ -123,7 +133,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     isSpeakingRef.current = false;
   };
 
-  // Função para falar texto com suporte a browser e openai-tts
   const speak = async (text: string) => {
     if (!text) return;
 
@@ -198,13 +207,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       } catch (error) {
         onSpeechError(error);
       }
+    } else if (voiceModel === "gemini-tts") {
+      showError("Gemini TTS ainda não está implementado.");
+      onSpeechEnd();
     } else {
       showError("Modelo de voz não suportado ou chave API ausente.");
       onSpeechEnd();
     }
   };
 
-  // Funções para iniciar e parar escuta
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
       setTranscript("");
@@ -220,7 +231,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setIsListening(false);
   };
 
-  // Iniciar assistente e criar conversa
   const startAssistant = async () => {
     if (!workspace?.id) {
       showError("Workspace não encontrado para iniciar o assistente.");
@@ -246,7 +256,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Buscar histórico de mensagens para contexto
   const fetchMessageHistory = async (currentConversationId: string, limit: number) => {
     if (limit === 0) return [];
 
@@ -269,7 +278,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     })).reverse();
   };
 
-  // Processar input do usuário, salvar mensagem, obter resposta IA, salvar resposta
   const processUserInput = async (inputText: string) => {
     if (!conversationId || !workspace?.id) {
       showError("Conversa não iniciada ou workspace ausente.");
@@ -313,11 +321,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Buscar resposta da OpenAI
   const fetchOpenAIResponse = async (userMessage: string, history: Message[]): Promise<string> => {
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
       return "Desculpe, a chave da API OpenAI não está configurada.";
+    }
+
+    if (model === "gemini-pro") {
+      showError("Modelo Gemini IA ainda não está implementado. Use OpenAI.");
+      return "Modelo Gemini IA não suportado ainda.";
     }
 
     const messagesForApi = [
