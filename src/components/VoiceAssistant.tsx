@@ -47,20 +47,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const isSpeakingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isStartingRecognition = useRef(false);
 
-  useEffect(() => {
-    if (voiceModel === "gemini-tts") {
-      showError("Gemini TTS ainda não está implementado.");
-    }
-  }, [voiceModel]);
-
-  useEffect(() => {
-    if (model === "gemini-pro") {
-      showError("Modelo Gemini IA ainda não está implementado. Use OpenAI.");
-    }
-  }, [model]);
-
-  // Initialize Speech Recognition and Synthesis
   useEffect(() => {
     const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -91,8 +79,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
-        if (assistantStarted && !isSpeakingRef.current) {
-          recognitionRef.current?.start();
+        // Reiniciar escuta somente se assistente ativo e não estiver falando
+        if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
+          startListening();
         }
       };
 
@@ -145,7 +134,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       if (assistantStarted && !isListening) {
-        recognitionRef.current?.start();
+        startListening();
       }
     };
 
@@ -218,9 +207,18 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
+      isStartingRecognition.current = true;
       setTranscript("");
       setAiResponse("");
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error("Erro ao iniciar reconhecimento de voz:", error);
+        showError("Erro ao iniciar reconhecimento de voz.");
+      } finally {
+        isStartingRecognition.current = false;
+      }
     }
   };
 
@@ -238,6 +236,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
 
     setAssistantStarted(true);
+    // Falar mensagem de boas-vindas e só iniciar escuta após terminar
     speak(welcomeMessage);
 
     const { data, error } = await supabase
