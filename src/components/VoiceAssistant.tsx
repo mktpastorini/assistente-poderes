@@ -25,6 +25,7 @@ interface Message {
 }
 
 const OPENAI_TTS_API_URL = "https://api.openai.com/v1/audio/speech";
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 
 const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   welcomeMessage = "Bem-vindo ao site! Estou ouvindo. Diga 'ativar' para começar a conversar.",
@@ -326,10 +327,64 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setActivated(false);
   };
 
-  // Função placeholder para processar input do usuário (você pode implementar a lógica de chat aqui)
-  const processUserInput = (input: string) => {
-    setAiResponse("Processando: " + input);
-    // Aqui você pode chamar a API OpenAI chat completions e atualizar messageHistory etc.
+  // Função para enviar input do usuário para OpenAI Chat Completions e processar resposta
+  const processUserInput = async (input: string) => {
+    if (!openAiApiKey) {
+      showError("Chave API OpenAI não configurada.");
+      return;
+    }
+
+    setAiResponse("Processando...");
+
+    // Montar mensagens para enviar, incluindo sistema, assistente e histórico limitado
+    const messages: Message[] = [
+      { role: "system", content: systemPrompt },
+      { role: "assistant", content: assistantPrompt },
+      ...messageHistory.slice(-conversationMemoryLength),
+      { role: "user", content: input },
+    ];
+
+    try {
+      const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${openAiApiKey}`,
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 1000,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        showError(`Erro OpenAI: ${errorData.error?.message || response.statusText}`);
+        setAiResponse("");
+        return;
+      }
+
+      const data = await response.json();
+      const assistantMessage = data.choices?.[0]?.message?.content || "";
+
+      setAiResponse(assistantMessage);
+
+      // Atualizar histórico de mensagens
+      setMessageHistory((prev) => [
+        ...prev,
+        { role: "user", content: input },
+        { role: "assistant", content: assistantMessage },
+      ]);
+
+      // Falar a resposta da IA
+      await speak(assistantMessage);
+    } catch (error) {
+      showError("Erro ao comunicar com a API OpenAI.");
+      setAiResponse("");
+      console.error(error);
+    }
   };
 
   return (
@@ -395,7 +450,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           </p>
         )}
         {aiResponse && (
-          <p className="text-indigo-300 text-lg">
+          <p className="text-indigo-300 text-lg whitespace-pre-wrap">
             <span className="font-semibold">IA responde:</span> {aiResponse}
           </p>
         )}
