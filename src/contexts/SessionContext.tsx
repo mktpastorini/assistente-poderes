@@ -78,9 +78,14 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
             .single();
 
           if (profileError) {
-            console.error('Error fetching profile:', profileError, 'Status:', status);
-            showError('Erro ao carregar perfil.');
-            setProfile(null);
+            if (profileError.code === 'PGRST116') {
+              // Nenhum perfil encontrado, não é erro crítico
+              setProfile(null);
+            } else {
+              console.error('Error fetching profile:', profileError, 'Status:', status);
+              showError('Erro ao carregar perfil.');
+              setProfile(null);
+            }
           } else {
             setProfile(profileData);
           }
