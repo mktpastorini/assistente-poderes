@@ -11,66 +11,49 @@ serve(async (req) => {
   }
 
   try {
-    // Diretamente processa o corpo como JSON. Isso irá falhar se o corpo estiver vazio ou não for um JSON válido.
-    const requestBody = await req.json();
-    const { url, method, headers, body } = requestBody;
+    const payload = await req.json();
+    const { url, method, headers, body } = payload;
 
     if (!url || !method) {
-      return new Response(JSON.stringify({ error: 'URL e método são obrigatórios no payload JSON.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      throw new Error('URL and method are required in the payload.');
     }
 
-    const outgoingHeaders = new Headers(headers || {});
-    outgoingHeaders.delete('Content-Length');
-
-    const fetchOptions: RequestInit = {
-      method: method,
-      headers: outgoingHeaders,
+    const fetchOptions = {
+      method,
+      headers: headers || {},
+      body: body ? JSON.stringify(body) : undefined,
     };
 
-    const methodsWithBody = ['POST', 'PUT', 'PATCH'];
-    if (methodsWithBody.includes(method.toUpperCase()) && body && Object.keys(body).length > 0) {
-      fetchOptions.body = JSON.stringify(body);
-      if (!outgoingHeaders.has('Content-Type')) {
-        outgoingHeaders.set('Content-Type', 'application/json');
-      }
-    }
-
     const response = await fetch(url, fetchOptions);
-    const responseText = await response.text();
-
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch {
-      responseData = responseText;
-    }
-
-    const responseHeaders = Object.fromEntries(response.headers.entries());
-
-    return new Response(JSON.stringify({
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      data: responseData,
-      headers: responseHeaders,
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
-  } catch (error) {
-    // Captura erros de parsing ou outros erros inesperados.
-    const isJsonError = error instanceof SyntaxError && error.message.includes('JSON');
-    const errorMessage = isJsonError ? "O corpo da requisição está vazio ou não é um JSON válido." : error.message;
     
-    console.error('Erro na Edge Function:', errorMessage, error.stack);
+    // Tenta processar como JSON, mas se falhar, retorna o texto bruto.
+    const responseData = await response.json().catch(async () => await response.text());
 
-    return new Response(JSON.stringify({ error: errorMessage, stack: error.stack }), {
-      status: isJsonError ? 400 : 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        data: responseData,
+        headers: Object.fromEntries(response.headers.entries()),
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  } catch (error) {
+    console.error('Edge Function Error:', error);
+    const isJsonError = error instanceof SyntaxError;
+    const status = isJsonError ? 400 : 500;
+    const message = isJsonError ? "Invalid JSON payload received." : error.message;
+
+    return new Response(
+      JSON.stringify({ error: message, stack: error.stack }),
+      {
+        status: status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 });
