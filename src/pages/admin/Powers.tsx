@@ -77,7 +77,7 @@ const PowersPage: React.FC = () => {
       description: "",
       method: "GET",
       url: "",
-      headers: "{}",
+      headers: '{"Content-Type": "application/json"}', // Default to JSON content type
       body: "{}",
       api_key_id: null,
     },
@@ -267,10 +267,18 @@ const PowersPage: React.FC = () => {
       showSuccess("Teste de poder concluído!");
 
     } catch (e: any) {
-      showError(`Erro ao testar poder: ${e.message}`);
+      let errorMessage = `Erro ao testar poder: ${e.message}`;
+      let errorDetails = e.stack;
+
+      if (e instanceof TypeError && e.message === "Failed to fetch") {
+        errorMessage = "Erro de rede ou CORS: A requisição falhou. Isso pode ser devido a um problema de conexão, um URL incorreto, ou mais comumente, uma política de CORS (Cross-Origin Resource Sharing) que impede que seu navegador acesse o recurso de outro domínio. Tente usar um proxy ou um Edge Function para contornar isso, ou verifique se a API de destino permite requisições do seu domínio (http://localhost:3200).";
+        errorDetails = "Verifique o console do navegador para mais detalhes sobre o erro CORS. Exemplo de API que funciona com CORS: https://jsonplaceholder.typicode.com/todos/1";
+      }
+
+      showError(errorMessage);
       setTestResult({
-        error: e.message,
-        details: e.stack,
+        error: errorMessage,
+        details: errorDetails,
       });
       console.error("Erro ao testar poder:", e);
     } finally {
