@@ -26,6 +26,7 @@ const settingsSchema = z.object({
   assistant_prompt: z.string().min(10, "Prompt do assistente é obrigatório"),
   ai_model: z.enum(["openai-gpt4", "openai-gpt3.5", "gemini-pro", "gpt-4o-mini"]),
   voice_model: z.enum(["browser", "openai-tts", "gemini-tts"]),
+  openai_tts_voice: z.string().optional().nullable(),
   voice_sensitivity: z.number().min(0).max(100),
   openai_api_key: z.string().optional().nullable(),
   gemini_api_key: z.string().optional().nullable(),
@@ -42,12 +43,21 @@ const defaultValues: SettingsFormData = {
     "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
   ai_model: "gpt-4o-mini",
   voice_model: "browser",
+  openai_tts_voice: "alloy",
   voice_sensitivity: 50,
   openai_api_key: "",
   gemini_api_key: "",
   conversation_memory_length: 5,
   activation_phrase: "ativar",
 };
+
+const OPENAI_TTS_VOICES = [
+  { value: "alloy", label: "Alloy" },
+  { value: "standard", label: "Standard" },
+  { value: "female-1", label: "Female 1" },
+  { value: "male-1", label: "Male 1" },
+  // Adicione mais vozes conforme necessário
+];
 
 const SettingsPage: React.FC = () => {
   const { workspace, loading } = useSession();
@@ -58,11 +68,14 @@ const SettingsPage: React.FC = () => {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
     defaultValues,
   });
+
+  const voiceModel = watch("voice_model");
 
   useEffect(() => {
     if (!loading && workspace && workspace.id) {
@@ -84,6 +97,7 @@ const SettingsPage: React.FC = () => {
             setValue("assistant_prompt", data.assistant_prompt || defaultValues.assistant_prompt);
             setValue("ai_model", data.ai_model || defaultValues.ai_model);
             setValue("voice_model", data.voice_model || defaultValues.voice_model);
+            setValue("openai_tts_voice", data.openai_tts_voice || defaultValues.openai_tts_voice);
             setValue("voice_sensitivity", data.voice_sensitivity ?? defaultValues.voice_sensitivity);
             setValue("openai_api_key", data.openai_api_key || defaultValues.openai_api_key);
             setValue("gemini_api_key", data.gemini_api_key || defaultValues.gemini_api_key);
@@ -108,6 +122,7 @@ const SettingsPage: React.FC = () => {
         assistant_prompt: formData.assistant_prompt,
         ai_model: formData.ai_model,
         voice_model: formData.voice_model,
+        openai_tts_voice: formData.openai_tts_voice || null,
         voice_sensitivity: formData.voice_sensitivity,
         openai_api_key: formData.openai_api_key || null,
         gemini_api_key: formData.gemini_api_key || null,
@@ -214,6 +229,34 @@ const SettingsPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {voiceModel === "openai-tts" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Voz OpenAI TTS</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Controller
+              control={control}
+              name="openai_tts_voice"
+              render={({ field }) => (
+                <Select onValueChange={field.onChange} value={field.value || "alloy"}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a voz OpenAI TTS" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {OPENAI_TTS_VOICES.map((voice) => (
+                      <SelectItem key={voice.value} value={voice.value}>
+                        {voice.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Sensibilidade do Microfone</CardTitle>
@@ -224,8 +267,8 @@ const SettingsPage: React.FC = () => {
             name="voice_sensitivity"
             render={({ field }) => (
               <Slider
-                value={[field.value ?? 50]} // Corrigido: valor deve ser array de números
-                onValueChange={(value) => field.onChange(value[0])} // Extrai o número do array
+                value={[field.value ?? 50]}
+                onValueChange={(value) => field.onChange(value[0])}
                 min={0}
                 max={100}
                 step={1}
