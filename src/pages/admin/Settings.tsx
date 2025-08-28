@@ -51,26 +51,17 @@ const defaultValues: SettingsFormData = {
   activation_phrase: "ativar",
 };
 
-// Lista oficial de vozes OpenAI TTS (modelo tts-1) conforme documentação atual
+// Lista corrigida de vozes OpenAI TTS válidas para o parâmetro 'voice' da API
 const OPENAI_TTS_VOICES = [
+  { value: "nova", label: "Nova" },
+  { value: "shimmer", label: "Shimmer" },
+  { value: "echo", label: "Echo" },
+  { value: "onyx", label: "Onyx" },
+  { value: "fable", label: "Fable" },
   { value: "alloy", label: "Alloy (padrão)" },
-  { value: "antoni", label: "Antoni (masculino, inglês)" },
-  { value: "bella", label: "Bella (feminino, inglês)" },
-  { value: "carmit", label: "Carmit (feminino, hebraico)" },
-  { value: "dario", label: "Dario (masculino, italiano)" },
-  { value: "ellen", label: "Ellen (feminino, inglês)" },
-  { value: "gabrielle", label: "Gabrielle (feminino, francês)" },
-  { value: "josef", label: "Josef (masculino, alemão)" },
-  { value: "karl", label: "Karl (masculino, alemão)" },
-  { value: "laura", label: "Laura (feminino, espanhol)" },
-  { value: "maria", label: "Maria (feminino, espanhol)" },
-  { value: "matthew", label: "Matthew (masculino, inglês)" },
-  { value: "natalie", label: "Natalie (feminino, inglês)" },
-  { value: "pierre", label: "Pierre (masculino, francês)" },
-  { value: "ricardo", label: "Ricardo (masculino, português)" },
-  { value: "sara", label: "Sara (feminino, inglês)" },
-  { value: "sophie", label: "Sophie (feminino, francês)" },
-  { value: "xiaoyan", label: "Xiaoyan (feminino, chinês)" },
+  { value: "ash", label: "Ash" },
+  { value: "sage", label: "Sage" },
+  { value: "coral", label: "Coral" },
 ];
 
 const SettingsPage: React.FC = () => {
@@ -307,6 +298,7 @@ const SettingsPage: React.FC = () => {
             {...register("openai_api_key")}
             type="password"
             placeholder="Sua chave API OpenAI"
+            autoComplete="new-password"
           />
         </CardContent>
       </Card>
@@ -320,6 +312,7 @@ const SettingsPage: React.FC = () => {
             {...register("gemini_api_key")}
             type="password"
             placeholder="Sua chave API Gemini"
+            autoComplete="new-password"
           />
         </CardContent>
       </Card>
