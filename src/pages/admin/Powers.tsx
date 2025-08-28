@@ -234,51 +234,35 @@ const PowersPage: React.FC = () => {
         ? JSON.parse(formData.body)
         : undefined;
 
-      // IMPORTANT: API keys are NOT decrypted client-side for security reasons.
-      // If your headers/body contain {{API_KEY}} placeholders, they will not be resolved here.
-      // For secure testing with API keys, an Edge Function is recommended.
-
-      const fetchOptions: RequestInit = {
-        method: formData.method,
-        headers: parsedHeaders,
-      };
-
-      if (parsedBody) {
-        fetchOptions.body = JSON.stringify(parsedBody);
-      }
-
-      const response = await fetch(formData.url, fetchOptions);
-      const responseText = await response.text(); // Get raw text first to handle non-JSON responses
-
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch {
-        responseData = responseText; // If not JSON, keep as text
-      }
-
-      setTestResult({
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        data: responseData,
-        headers: Object.fromEntries(response.headers.entries()),
+      // Invoke the Supabase Edge Function to proxy the request
+      const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', {
+        body: {
+          url: formData.url,
+          method: formData.method,
+          headers: parsedHeaders,
+          body: parsedBody,
+        },
       });
-      showSuccess("Teste de poder concluído!");
+
+      if (invokeError) {
+        showError(`Erro ao invocar Edge Function: ${invokeError.message}`);
+        setTestResult({
+          error: `Erro ao invocar Edge Function: ${invokeError.message}`,
+          details: invokeError.stack,
+        });
+        console.error("Erro ao invocar Edge Function:", invokeError);
+        return;
+      }
+
+      // The Edge Function returns the actual API response data
+      setTestResult(data);
+      showSuccess("Teste de poder concluído via Edge Function!");
 
     } catch (e: any) {
-      let errorMessage = `Erro ao testar poder: ${e.message}`;
-      let errorDetails = e.stack;
-
-      if (e instanceof TypeError && e.message === "Failed to fetch") {
-        errorMessage = "Erro de rede ou CORS: A requisição falhou. Isso pode ser devido a um problema de conexão, um URL incorreto, ou mais comumente, uma política de CORS (Cross-Origin Resource Sharing) que impede que seu navegador acesse o recurso de outro domínio. Tente usar um proxy ou um Edge Function para contornar isso, ou verifique se a API de destino permite requisições do seu domínio (http://localhost:3200).";
-        errorDetails = "Verifique o console do navegador para mais detalhes sobre o erro CORS. Exemplo de API que funciona com CORS: https://jsonplaceholder.typicode.com/todos/1";
-      }
-
-      showError(errorMessage);
+      showError(`Erro ao testar poder: ${e.message}`);
       setTestResult({
-        error: errorMessage,
-        details: errorDetails,
+        error: `Erro ao testar poder: ${e.message}`,
+        details: e.stack,
       });
       console.error("Erro ao testar poder:", e);
     } finally {
@@ -417,8 +401,9 @@ const PowersPage: React.FC = () => {
               </div>
             )}
             <p className="text-sm text-muted-foreground mt-4">
-              Nota: Chaves de API criptografadas não são descriptografadas no navegador para testes.
-              Para testar poderes que dependem de chaves de API seguras, considere usar um Edge Function.
+              Nota: Este teste utiliza uma Edge Function do Supabase para contornar problemas de CORS.
+              Chaves de API criptografadas não são descriptografadas automaticamente por esta Edge Function proxy.
+              Para lidar com chaves de API de forma segura e dinâmica, a Edge Function precisaria de lógica adicional para buscar e usar as chaves do Supabase Secrets ou da tabela `api_keys`.
             </p>
           </CardContent>
         </Card>
