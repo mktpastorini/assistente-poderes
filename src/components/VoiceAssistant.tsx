@@ -14,7 +14,7 @@ interface VoiceAssistantProps {
   assistantPrompt?: string;
   model?: string;
   conversationMemoryLength: number;
-  voiceModel: "browser" | "openai-tts" | "gemini-tts"; // Nova prop
+  voiceModel: "browser" | "openai-tts" | "gemini-tts";
 }
 
 const OPENAI_CHAT_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -32,7 +32,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   assistantPrompt = "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
   model = "gpt-4o-mini",
   conversationMemoryLength,
-  voiceModel, // Usando a nova prop
+  voiceModel,
 }) => {
   const { workspace } = useSession();
   const [isListening, setIsListening] = useState(false);
@@ -46,7 +46,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const isSpeakingRef = useRef(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null); // Para áudio da API
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // Initialize Speech Recognition and Synthesis
   useEffect(() => {
@@ -68,33 +68,18 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         setTranscript(currentTranscript);
 
         if (currentTranscript.includes("parar de falar")) {
-          if (synthRef.current && synthRef.current.speaking) {
-            synthRef.current.cancel();
-            setIsSpeaking(false);
-            isSpeakingRef.current = false;
-            showSuccess("Fala interrompida pelo usuário.");
-          }
-          if (audioRef.current && !audioRef.current.paused) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setIsSpeaking(false);
-            isSpeakingRef.current = false;
-            showSuccess("Fala interrompida pelo usuário.");
-          }
-          // If assistant is active, restart listening immediately after interruption
-          if (assistantStarted && !isListening) {
-            recognitionRef.current?.start();
-          }
+          stopListening();
+          stopSpeaking();
           return;
         }
 
-        recognitionRef.current?.stop(); // Stop to process and speak
+        stopListening(); // Parar para processar e falar
         processUserInput(currentTranscript);
       };
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
-        // If assistant is active and not speaking, restart listening for continuous conversation
+        // Reiniciar escuta somente se assistente ativo e não estiver falando
         if (assistantStarted && !isSpeakingRef.current) {
           recognitionRef.current?.start();
         }
@@ -116,24 +101,17 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
 
     return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      if (synthRef.current) {
-        synthRef.current.cancel();
-      }
+      stopListening();
+      stopSpeaking();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
     };
-  }, [assistantStarted]); // Removed isListening from dependencies
+  }, [assistantStarted]);
 
-  // Function to handle AI speaking
-  const speak = async (text: string) => {
-    if (!text) return;
-
-    // Cancel any ongoing speech before starting new one
+  // Função para parar fala (navegador e áudio)
+  const stopSpeaking = () => {
     if (synthRef.current && synthRef.current.speaking) {
       synthRef.current.cancel();
     }
@@ -141,6 +119,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
+    setIsSpeaking(false);
+    isSpeakingRef.current = false;
+  };
+
+  // Função para falar texto com suporte a browser e openai-tts
+  const speak = async (text: string) => {
+    if (!text) return;
+
+    stopSpeaking();
 
     setIsSpeaking(true);
     isSpeakingRef.current = true;
@@ -156,11 +143,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     const onSpeechError = (error: any) => {
       console.error("Erro de síntese de fala:", error);
       showError(`Erro de fala: ${error}`);
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
-      if (assistantStarted && !isListening) {
-        recognitionRef.current?.start();
-      }
+      onSpeechEnd();
     };
 
     if (voiceModel === "browser" && synthRef.current) {
@@ -182,8 +165,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
             Authorization: `Bearer ${openAiApiKey}`,
           },
           body: JSON.stringify({
-            model: "tts-1", // Pode ser configurável no futuro
-            voice: "alloy", // Pode ser configurável no futuro
+            model: "tts-1",
+            voice: "alloy",
             input: text,
           }),
         });
@@ -196,7 +179,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
         const audioBlob = await response.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        
+
         if (audioRef.current) {
           audioRef.current.src = audioUrl;
         } else {
@@ -205,24 +188,23 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
         audioRef.current.onended = () => {
           onSpeechEnd();
-          URL.revokeObjectURL(audioUrl); // Clean up the object URL
+          URL.revokeObjectURL(audioUrl);
         };
-        audioRef.current.onerror = (event) => {
+        audioRef.current.onerror = () => {
           onSpeechError("Erro ao reproduzir áudio da IA.");
           URL.revokeObjectURL(audioUrl);
         };
         audioRef.current.play();
-
       } catch (error) {
         onSpeechError(error);
       }
     } else {
       showError("Modelo de voz não suportado ou chave API ausente.");
-      onSpeechEnd(); // Ensure state is reset even if no speech occurs
+      onSpeechEnd();
     }
   };
 
-  // Start/Stop Listening functions
+  // Funções para iniciar e parar escuta
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
       setTranscript("");
@@ -235,9 +217,10 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
     }
+    setIsListening(false);
   };
 
-  // Start Assistant and create/load conversation
+  // Iniciar assistente e criar conversa
   const startAssistant = async () => {
     if (!workspace?.id) {
       showError("Workspace não encontrado para iniciar o assistente.");
@@ -247,7 +230,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setAssistantStarted(true);
     speak(welcomeMessage);
 
-    // Create a new conversation for this session
     const { data, error } = await supabase
       .from('conversations')
       .insert({ workspace_id: workspace.id, channel: 'web', status: 'active' })
@@ -260,11 +242,11 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setConversationId(null);
     } else {
       setConversationId(data.id);
-      setMessageHistory([]); // Start with empty history for new conversation
+      setMessageHistory([]);
     }
   };
 
-  // Fetch previous messages for context
+  // Buscar histórico de mensagens para contexto
   const fetchMessageHistory = async (currentConversationId: string, limit: number) => {
     if (limit === 0) return [];
 
@@ -281,14 +263,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       return [];
     }
 
-    // Reverse to maintain chronological order for AI context
     return data.map(msg => ({
       role: msg.role as "user" | "assistant",
       content: (msg.content as { text: string }).text,
     })).reverse();
   };
 
-  // Process user input, store message, get AI response, store AI response
+  // Processar input do usuário, salvar mensagem, obter resposta IA, salvar resposta
   const processUserInput = async (inputText: string) => {
     if (!conversationId || !workspace?.id) {
       showError("Conversa não iniciada ou workspace ausente.");
@@ -297,7 +278,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
     setAiResponse("Processando...");
 
-    // Store user message
     const { error: userMessageError } = await supabase
       .from('messages')
       .insert({
@@ -312,7 +292,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       return;
     }
 
-    // Fetch updated history for context
     const currentHistory = await fetchMessageHistory(conversationId, conversationMemoryLength);
     setMessageHistory(currentHistory);
 
@@ -320,7 +299,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     setAiResponse(response);
     speak(response);
 
-    // Store AI response
     const { error: aiMessageError } = await supabase
       .from('messages')
       .insert({
@@ -335,7 +313,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Fetch response from OpenAI API
+  // Buscar resposta da OpenAI
   const fetchOpenAIResponse = async (userMessage: string, history: Message[]): Promise<string> => {
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
@@ -345,7 +323,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     const messagesForApi = [
       { role: "system", content: systemPrompt },
       { role: "assistant", content: assistantPrompt },
-      ...history, // Add historical messages
+      ...history,
       { role: "user", content: userMessage },
     ];
 
