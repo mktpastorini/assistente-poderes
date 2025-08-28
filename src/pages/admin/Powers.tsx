@@ -77,7 +77,6 @@ const PowersPage: React.FC = () => {
       description: "",
       method: "GET",
       url: "",
-      // Removido o cabeçalho de Authorization padrão, pois timeapi.io não precisa e pode causar 403
       headers: '{"Content-Type": "application/json"}', 
       body: "{}",
       api_key_id: null,
@@ -168,7 +167,6 @@ const PowersPage: React.FC = () => {
         reset();
         setEditingPowerId(null);
         setTestResult(null); // Clear test result on save
-        // Recarregar poderes
         const { data: updatedPowers, error: fetchError } = await supabase
           .from('powers')
           .select('*')
@@ -193,7 +191,7 @@ const PowersPage: React.FC = () => {
     setValue("headers", JSON.stringify(power.headers || {}, null, 2));
     setValue("body", JSON.stringify(power.body || {}, null, 2));
     setValue("api_key_id", power.api_key_id);
-    setTestResult(null); // Clear test result when editing a new power
+    setTestResult(null);
   };
 
   const onDelete = async (id: string) => {
@@ -235,7 +233,6 @@ const PowersPage: React.FC = () => {
         ? JSON.parse(formData.body)
         : undefined;
 
-      // Invoke the Supabase Edge Function to proxy the request
       const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', {
         body: {
           url: formData.url,
@@ -243,22 +240,26 @@ const PowersPage: React.FC = () => {
           headers: parsedHeaders,
           body: parsedBody,
         },
-        headers: { // Explicitly set Content-Type for the invocation itself
+        headers: {
           'Content-Type': 'application/json',
         },
       });
 
       if (invokeError) {
-        showError(`Erro ao invocar Edge Function: ${invokeError.message}`);
+        // Extract detailed error message from the function's response
+        const errorContext = (invokeError as any).context || {};
+        const detailedError = errorContext.error || invokeError.message;
+        const errorStack = errorContext.stack || invokeError.stack;
+
+        showError(`Erro da Edge Function: ${detailedError}`);
         setTestResult({
-          error: `Erro ao invocar Edge Function: ${invokeError.message}`,
-          details: invokeError.stack,
+          error: `Erro da Edge Function: ${detailedError}`,
+          details: errorStack,
         });
         console.error("Erro ao invocar Edge Function:", invokeError);
         return;
       }
 
-      // The Edge Function returns the actual API response data
       setTestResult(data);
       showSuccess("Teste de poder concluído via Edge Function!");
 
@@ -407,7 +408,6 @@ const PowersPage: React.FC = () => {
             <p className="text-sm text-muted-foreground mt-4">
               Nota: Este teste utiliza uma Edge Function do Supabase para contornar problemas de CORS.
               Chaves de API criptografadas não são descriptografadas automaticamente por esta Edge Function proxy.
-              Para lidar com chaves de API de forma segura e dinâmica, a Edge Function precisaria de lógica adicional para buscar e usar as chaves do Supabase Secrets ou da tabela `api_keys`.
             </p>
           </CardContent>
         </Card>
