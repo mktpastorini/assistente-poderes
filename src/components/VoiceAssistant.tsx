@@ -430,7 +430,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           <div className="flex space-x-4">
             <Button
               onClick={startListening}
-              disabled={isListening || isSpeaking}
+              disabled={isListening || isSpeaking || activated}
               className="bg-pink-500 hover:bg-pink-600 text-white"
             >
               <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
