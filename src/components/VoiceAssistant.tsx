@@ -80,11 +80,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         isRecognitionActive.current = true;
         setIsListening(true);
         showSuccess("Estou ouvindo...");
+        console.log("[VoiceAssistant] Reconhecimento iniciado");
       };
 
       recognitionRef.current.onresult = (event) => {
         const currentTranscript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
         setTranscript(currentTranscript);
+        console.log("[VoiceAssistant] Reconhecido:", currentTranscript);
 
         if (currentTranscript.includes("parar de falar")) {
           stopListening();
@@ -107,6 +109,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       recognitionRef.current.onend = () => {
         isRecognitionActive.current = false;
         setIsListening(false);
+        console.log("[VoiceAssistant] Reconhecimento finalizado");
         // Reiniciar escuta automaticamente se assistente estiver ativado e não estiver falando
         if (assistantStarted && activated && !isSpeakingRef.current) {
           restartTimeoutRef.current = setTimeout(() => {
@@ -116,7 +119,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       };
 
       recognitionRef.current.onerror = (event) => {
-        console.error("Erro de reconhecimento de fala:", event.error);
+        console.error("[VoiceAssistant] Erro de reconhecimento de fala:", event.error);
         showError(`Erro de voz: ${event.error}`);
         isRecognitionActive.current = false;
         setIsListening(false);
@@ -127,9 +130,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
               startListening();
             } catch (error) {
               if (error instanceof DOMException && error.name === "InvalidStateError") {
-                console.warn("Reconhecimento já está ativo, ignorando erro.");
+                console.warn("[VoiceAssistant] Reconhecimento já está ativo, ignorando erro.");
               } else {
-                console.error("Erro ao reiniciar reconhecimento após erro:", error);
+                console.error("[VoiceAssistant] Erro ao reiniciar reconhecimento após erro:", error);
               }
             }
           }, 300);
@@ -168,7 +171,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           .single();
 
         if (error) {
-          console.error("Erro ao criar conversa:", error);
+          console.error("[VoiceAssistant] Erro ao criar conversa:", error);
           showError("Erro ao iniciar nova conversa.");
           setConversationId(null);
         } else {
@@ -216,6 +219,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     const onSpeechEnd = () => {
       setIsSpeaking(false);
       isSpeakingRef.current = false;
+      console.log("[VoiceAssistant] Fala finalizada");
       // Reiniciar escuta automaticamente após a fala da IA
       if (assistantStarted && activated) {
         restartTimeoutRef.current = setTimeout(() => {
@@ -229,7 +233,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         onSpeechEnd();
         return;
       }
-      console.error("Erro de síntese de fala:", error);
+      console.error("[VoiceAssistant] Erro de síntese de fala:", error);
       showError(`Erro de fala: ${error}`);
       onSpeechEnd();
     };
@@ -305,11 +309,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         recognitionRef.current.start();
         isRecognitionActive.current = true;
         setIsListening(true);
+        console.log("[VoiceAssistant] Iniciando escuta");
       } catch (error) {
         if (error instanceof DOMException && error.name === "InvalidStateError") {
-          console.warn("Reconhecimento já está ativo, ignorando erro.");
+          console.warn("[VoiceAssistant] Reconhecimento já está ativo, ignorando erro.");
         } else {
-          console.error("Erro ao iniciar reconhecimento de voz:", error);
+          console.error("[VoiceAssistant] Erro ao iniciar reconhecimento de voz:", error);
           showError("Erro ao iniciar reconhecimento de voz.");
         }
       } finally {
@@ -322,6 +327,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
       isRecognitionActive.current = false;
+      console.log("[VoiceAssistant] Escuta parada");
     }
     setIsListening(false);
   };
@@ -329,6 +335,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const startAssistant = () => {
     setAssistantStarted(true);
     setActivated(false);
+    console.log("[VoiceAssistant] Assistente iniciado");
   };
 
   // Função para enviar input do usuário para OpenAI Chat Completions e processar resposta
@@ -339,6 +346,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
 
     setAiResponse("Processando...");
+    console.log("[VoiceAssistant] Processando input do usuário:", input);
 
     // Montar mensagens para enviar, incluindo sistema, assistente e histórico limitado
     const messages: Message[] = [
@@ -372,6 +380,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
       const data = await response.json();
       const assistantMessage = data.choices?.[0]?.message?.content || "";
+      console.log("[VoiceAssistant] Resposta da IA:", assistantMessage);
 
       setAiResponse(assistantMessage);
 
@@ -387,7 +396,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     } catch (error) {
       showError("Erro ao comunicar com a API OpenAI.");
       setAiResponse("");
-      console.error(error);
+      console.error("[VoiceAssistant] Erro na comunicação com a API OpenAI:", error);
     }
   };
 
