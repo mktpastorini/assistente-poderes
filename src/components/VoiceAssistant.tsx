@@ -106,11 +106,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       recognitionRef.current.onend = () => {
         isRecognitionActive.current = false;
         setIsListening(false);
-        if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
-          restartTimeoutRef.current = setTimeout(() => {
-            startListening();
-          }, 500);
-        }
+        // Não reiniciar aqui para evitar conflito com fala
       };
 
       recognitionRef.current.onerror = (event) => {
@@ -118,19 +114,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         showError(`Erro de voz: ${event.error}`);
         isRecognitionActive.current = false;
         setIsListening(false);
-        if (assistantStarted && !isSpeakingRef.current) {
-          restartTimeoutRef.current = setTimeout(() => {
-            try {
-              startListening();
-            } catch (error) {
-              if (error instanceof DOMException && error.name === "InvalidStateError") {
-                console.warn("Reconhecimento já está ativo, ignorando erro.");
-              } else {
-                console.error("Erro ao reiniciar reconhecimento após erro:", error);
-              }
-            }
-          }, 500);
-        }
       };
     } else {
       showError("Seu navegador não suporta reconhecimento de fala.");
@@ -213,7 +196,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     const onSpeechEnd = () => {
       setIsSpeaking(false);
       isSpeakingRef.current = false;
-      if (assistantStarted && !isListening) {
+      // Reiniciar escuta automaticamente após a fala da IA
+      if (assistantStarted) {
         restartTimeoutRef.current = setTimeout(() => {
           startListening();
         }, 500);
