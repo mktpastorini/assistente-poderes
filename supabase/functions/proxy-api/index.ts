@@ -18,19 +18,23 @@ serve(async (req) => {
       throw new Error('URL and method are required in the payload.');
     }
 
-    // Create a new Headers object to avoid modifying the original
     const outgoingHeaders = new Headers(headers || {});
 
-    // Add a standard User-Agent header if one isn't already provided.
-    // Many APIs block requests without a User-Agent, causing a 403 Forbidden error.
+    // Add a standard User-Agent header to appear as a browser
     if (!outgoingHeaders.has('User-Agent')) {
       outgoingHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    }
+
+    // For GET requests, some servers reject a Content-Type header. Let's remove it.
+    if (method.toUpperCase() === 'GET') {
+      outgoingHeaders.delete('Content-Type');
     }
 
     const fetchOptions = {
       method,
       headers: outgoingHeaders,
-      body: body ? JSON.stringify(body) : undefined,
+      // Ensure body is only sent for appropriate methods
+      body: (method.toUpperCase() !== 'GET' && body) ? JSON.stringify(body) : undefined,
     };
 
     const response = await fetch(url, fetchOptions);
