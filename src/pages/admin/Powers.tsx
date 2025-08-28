@@ -233,13 +233,15 @@ const PowersPage: React.FC = () => {
         ? JSON.parse(formData.body)
         : undefined;
 
+      const payload = {
+        url: formData.url,
+        method: formData.method,
+        headers: parsedHeaders,
+        body: parsedBody,
+      };
+
       const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', {
-        body: {
-          url: formData.url,
-          method: formData.method,
-          headers: parsedHeaders,
-          body: parsedBody,
-        },
+        body: JSON.stringify(payload), // Manually stringify the payload
         headers: {
           'Content-Type': 'application/json',
         },
@@ -249,7 +251,6 @@ const PowersPage: React.FC = () => {
         let detailedError = invokeError.message;
         let errorStack = (invokeError as any).stack;
 
-        // The actual error response from the Edge Function is in the 'context' property
         if ((invokeError as any).context && typeof (invokeError as any).context.json === 'function') {
           try {
             const errorBody = await (invokeError as any).context.json();
@@ -257,13 +258,6 @@ const PowersPage: React.FC = () => {
             errorStack = errorBody.stack || errorStack;
           } catch (e) {
             console.error("Could not parse JSON from Edge Function error response:", e);
-            try {
-              // If it's not JSON, try to get the raw text
-              const errorText = await (invokeError as any).context.text();
-              detailedError = errorText || detailedError;
-            } catch (textErr) {
-              console.error("Could not get text from Edge Function error response:", textErr);
-            }
           }
         }
 

@@ -11,31 +11,12 @@ serve(async (req) => {
   }
 
   try {
-    // Lê o corpo da requisição como texto primeiro para evitar erros de JSON.
-    const rawBody = await req.text();
-    
-    // Se o corpo estiver vazio, a requisição é inválida para esta função.
-    if (!rawBody) {
-      return new Response(JSON.stringify({ error: "Request body is empty. Expected a JSON payload." }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    let requestBody;
-    try {
-      requestBody = JSON.parse(rawBody);
-    } catch (e) {
-      return new Response(JSON.stringify({ error: "Invalid JSON in request body.", details: e.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
+    // Diretamente processa o corpo como JSON. Isso irá falhar se o corpo estiver vazio ou não for um JSON válido.
+    const requestBody = await req.json();
     const { url, method, headers, body } = requestBody;
 
     if (!url || !method) {
-      return new Response(JSON.stringify({ error: 'URL and method are required.' }), {
+      return new Response(JSON.stringify({ error: 'URL e método são obrigatórios no payload JSON.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -81,9 +62,14 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Edge Function: Uncaught error:', error);
-    return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
-      status: 500,
+    // Captura erros de parsing ou outros erros inesperados.
+    const isJsonError = error instanceof SyntaxError && error.message.includes('JSON');
+    const errorMessage = isJsonError ? "O corpo da requisição está vazio ou não é um JSON válido." : error.message;
+    
+    console.error('Erro na Edge Function:', errorMessage, error.stack);
+
+    return new Response(JSON.stringify({ error: errorMessage, stack: error.stack }), {
+      status: isJsonError ? 400 : 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
