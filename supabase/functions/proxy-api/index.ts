@@ -11,9 +11,26 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Edge Function: Incoming request received.');
-    const requestBody = await req.json();
-    console.log('Edge Function: Parsed request body:', requestBody);
+    // Lê o corpo da requisição como texto primeiro para evitar erros de JSON.
+    const rawBody = await req.text();
+    
+    // Se o corpo estiver vazio, a requisição é inválida para esta função.
+    if (!rawBody) {
+      return new Response(JSON.stringify({ error: "Request body is empty. Expected a JSON payload." }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    let requestBody;
+    try {
+      requestBody = JSON.parse(rawBody);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: "Invalid JSON in request body.", details: e.message }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     const { url, method, headers, body } = requestBody;
 
@@ -24,10 +41,7 @@ serve(async (req) => {
       });
     }
 
-    // Use Headers constructor for safety and standard compliance
     const outgoingHeaders = new Headers(headers || {});
-
-    // Let the fetch implementation handle content-length
     outgoingHeaders.delete('Content-Length');
 
     const fetchOptions: RequestInit = {
@@ -35,21 +49,13 @@ serve(async (req) => {
       headers: outgoingHeaders,
     };
 
-    // Only include a body for methods that support it
     const methodsWithBody = ['POST', 'PUT', 'PATCH'];
-    if (methodsWithBody.includes(method.toUpperCase()) && body) {
+    if (methodsWithBody.includes(method.toUpperCase()) && body && Object.keys(body).length > 0) {
       fetchOptions.body = JSON.stringify(body);
-      // Ensure Content-Type is set if not already present
       if (!outgoingHeaders.has('Content-Type')) {
         outgoingHeaders.set('Content-Type', 'application/json');
       }
     }
-
-    console.log(`Edge Function: Preparing to fetch URL: ${url} with method: ${method}`);
-    console.log('Edge Function: Final fetch options:', {
-      ...fetchOptions,
-      headers: Object.fromEntries(outgoingHeaders.entries()), // Log headers as a plain object
-    });
 
     const response = await fetch(url, fetchOptions);
     const responseText = await response.text();
@@ -63,8 +69,6 @@ serve(async (req) => {
 
     const responseHeaders = Object.fromEntries(response.headers.entries());
 
-    console.log(`Edge Function: Received response from target. Status: ${response.status}`);
-
     return new Response(JSON.stringify({
       status: response.status,
       statusText: response.statusText,
@@ -77,7 +81,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Edge Function: Uncaught error during execution:', error);
+    console.error('Edge Function: Uncaught error:', error);
     return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
