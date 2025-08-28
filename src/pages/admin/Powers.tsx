@@ -31,6 +31,7 @@ interface Power {
   headers: Record<string, string> | null;
   body: Record<string, any> | null;
   api_key_id: string | null;
+  parameters_schema: Record<string, any> | null;
 }
 
 interface ApiKey {
@@ -49,6 +50,7 @@ const powerSchema = z.object({
   headers: z.string().optional().nullable(), // JSON string
   body: z.string().optional().nullable(), // JSON string
   api_key_id: z.string().optional().nullable(),
+  parameters_schema: z.string().optional().nullable(), // JSON string
 });
 
 type PowerFormData = z.infer<typeof powerSchema>;
@@ -80,6 +82,7 @@ const PowersPage: React.FC = () => {
       headers: '{"Content-Type": "application/json"}', 
       body: "{}",
       api_key_id: null,
+      parameters_schema: '{\n  "type": "object",\n  "properties": {},\n  "required": []\n}',
     },
   });
 
@@ -133,6 +136,7 @@ const PowersPage: React.FC = () => {
       const parsedBody = (formData.body && (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH"))
         ? JSON.parse(formData.body)
         : {};
+      const parsedParametersSchema = formData.parameters_schema ? JSON.parse(formData.parameters_schema) : {};
 
       const powerData = {
         workspace_id: workspace.id,
@@ -143,6 +147,7 @@ const PowersPage: React.FC = () => {
         headers: parsedHeaders,
         body: parsedBody,
         api_key_id: formData.api_key_id || null,
+        parameters_schema: parsedParametersSchema,
       };
 
       let error;
@@ -191,6 +196,7 @@ const PowersPage: React.FC = () => {
     setValue("headers", JSON.stringify(power.headers || {}, null, 2));
     setValue("body", JSON.stringify(power.body || {}, null, 2));
     setValue("api_key_id", power.api_key_id);
+    setValue("parameters_schema", JSON.stringify(power.parameters_schema || {}, null, 2));
     setTestResult(null);
   };
 
@@ -306,6 +312,19 @@ const PowersPage: React.FC = () => {
               <Label htmlFor="power-description">Descrição (para o prompt da IA)</Label>
               <Textarea id="power-description" placeholder="Descreva o que este poder faz e como a IA deve usá-lo. Ex: 'Quando o usuário perguntar a hora, execute o poder data_hora.'" rows={3} {...register("description")} />
               {errors.description && <p className="text-destructive text-sm mt-1">{errors.description.message}</p>}
+            </div>
+            <div>
+              <Label htmlFor="power-parameters-schema">Esquema de Parâmetros (JSON Schema)</Label>
+              <Textarea 
+                id="power-parameters-schema" 
+                placeholder='{"type": "object", "properties": {"cidade": {"type": "string", "description": "A cidade para obter o clima."}}, "required": ["cidade"]}' 
+                rows={5} 
+                {...register("parameters_schema")} 
+              />
+              {errors.parameters_schema && <p className="text-destructive text-sm mt-1">{errors.parameters_schema.message as string}</p>}
+              <p className="text-sm text-muted-foreground mt-1">
+                Defina os parâmetros que a IA pode enviar para este poder, usando o formato JSON Schema.
+              </p>
             </div>
             <div>
               <Label htmlFor="power-method">Método HTTP</Label>

@@ -20,8 +20,22 @@ interface VoiceAssistantProps {
 }
 
 interface Message {
-  role: "user" | "assistant" | "system";
+  role: "user" | "assistant" | "system" | "tool";
   content: string;
+  tool_calls?: any[];
+  tool_call_id?: string;
+}
+
+interface Power {
+  id: string;
+  name: string;
+  description: string | null;
+  method: string;
+  url: string | null;
+  headers: Record<string, string> | null;
+  body: Record<string, any> | null;
+  api_key_id: string | null;
+  parameters_schema: Record<string, any> | null;
 }
 
 const OPENAI_TTS_API_URL = "https://api.openai.com/v1/audio/speech";
@@ -48,6 +62,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
   const [activated, setActivated] = useState(false);
   const [initialGreetingSpoken, setInitialGreetingSpoken] = useState(false);
+  const [powers, setPowers] = useState<Power[]>([]);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -56,7 +71,26 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const isSpeakingRef = useRef(false);
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Verifica permissão do microfone
+  // Carrega os "Poderes" do workspace
+  useEffect(() => {
+    if (workspace?.id) {
+      const fetchPowers = async () => {
+        const { data, error } = await supabase
+          .from('powers')
+          .select('*')
+          .eq('workspace_id', workspace.id);
+        if (error) {
+          showError("Erro ao carregar os poderes da IA.");
+          console.error(error);
+        } else {
+          setPowers(data || []);
+          console.log("[VoiceAssistant] Poderes carregados:", data);
+        }
+      };
+      fetchPowers();
+    }
+  }, [workspace]);
+
   const checkMicrophonePermission = async (): Promise<boolean> => {
     if (!navigator.permissions) return true;
     try {
@@ -67,7 +101,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Inicia escuta
   const startListening = () => {
     if (recognitionRef.current && !isRecognitionActive.current && !isSpeakingRef.current) {
       try {
@@ -90,7 +123,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Para escuta
   const stopListening = () => {
     if (recognitionRef.current && isRecognitionActive.current) {
       recognitionRef.current.stop();
@@ -100,7 +132,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Para fala
   const stopSpeaking = () => {
     if (synthRef.current && synthRef.current.speaking) {
       synthRef.current.cancel();
@@ -114,7 +145,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     console.log("[VoiceAssistant] Fala parada");
   };
 
-  // Fala texto com voz selecionada
   const speak = async (text: string, onEndCallback?: () => void) => {
     if (!text) {
       onEndCallback?.();
@@ -201,28 +231,40 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Processa input do usuário enviando para OpenAI e falando resposta
-  const processUserInput = async (input: string) => {
-    console.log("[VoiceAssistant] openAiApiKey:", openAiApiKey);
+  // Orquestrador principal da conversa com a IA
+  const runConversation = async (userInput: string) => {
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
       setAiResponse("Por favor, configure sua chave API OpenAI nas configurações.");
-      // Reinicia a escuta mesmo sem API Key para continuar o fluxo
       startListening();
       return;
     }
 
+    console.log("[Orchestrator] Iniciando conversa com input:", userInput);
     setAiResponse("Processando...");
-    console.log("[VoiceAssistant] Processando input do usuário:", input);
 
-    const messages: Message[] = [
-      { role: "system", content: systemPrompt },
-      { role: "assistant", content: assistantPrompt },
-      ...messageHistory.slice(-conversationMemoryLength),
-      { role: "user", content: input },
-    ];
+    // Adiciona a mensagem do usuário ao histórico
+    const newHistory = [...messageHistory, { role: "user" as const, content: userInput }];
+    setMessageHistory(newHistory);
+
+    // Formata os "Poderes" para a API da OpenAI
+    const tools = powers.map(power => ({
+      type: 'function' as const,
+      function: {
+        name: power.name,
+        description: power.description,
+        parameters: power.parameters_schema,
+      },
+    }));
 
     try {
+      // Primeira chamada para a OpenAI
+      const messagesForApi = [
+        { role: "system" as const, content: systemPrompt },
+        { role: "assistant" as const, content: assistantPrompt },
+        ...newHistory.slice(-conversationMemoryLength),
+      ];
+
       const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
         method: "POST",
         headers: {
@@ -231,47 +273,112 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         },
         body: JSON.stringify({
           model: model,
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 1000,
+          messages: messagesForApi,
+          tools: tools.length > 0 ? tools : undefined,
+          tool_choice: tools.length > 0 ? 'auto' : undefined,
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        showError(`Erro OpenAI: ${errorData.error?.message || response.statusText}`);
-        setAiResponse("");
-        startListening(); // Reinicia a escuta em caso de erro da API
-        return;
+        throw new Error(`Erro OpenAI: ${errorData.error?.message || response.statusText}`);
       }
 
       const data = await response.json();
-      const assistantMessage = data.choices?.[0]?.message?.content || "";
-      console.log("[VoiceAssistant] Resposta da IA:", assistantMessage);
+      const responseMessage = data.choices?.[0]?.message;
 
-      setAiResponse(assistantMessage);
+      // Se a IA decidir usar uma ferramenta (Poder)
+      if (responseMessage.tool_calls) {
+        setAiResponse("Executando poder...");
+        console.log("[Orchestrator] IA solicitou o uso de poderes:", responseMessage.tool_calls);
+        
+        const historyWithToolCall = [...newHistory, responseMessage];
+        setMessageHistory(historyWithToolCall);
 
-      setMessageHistory((prev) => [
-        ...prev,
-        { role: "user", content: input },
-        { role: "assistant", content: assistantMessage },
-      ]);
+        const toolOutputs = [];
+        for (const toolCall of responseMessage.tool_calls) {
+          const functionName = toolCall.function.name;
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          const powerToExecute = powers.find(p => p.name === functionName);
 
-      await speak(assistantMessage, () => {
-        // Após a fala da IA, se o assistente estiver ativo, reinicia a escuta
-        if (activated) {
-          startListening();
+          if (powerToExecute) {
+            console.log(`[Orchestrator] Executando poder: ${functionName} com args:`, functionArgs);
+            
+            let url = powerToExecute.url || '';
+            Object.keys(functionArgs).forEach(key => {
+              const placeholder = `{${key}}`;
+              url = url.replace(new RegExp(placeholder, 'g'), encodeURIComponent(functionArgs[key]));
+            });
+
+            const { data: toolResult, error: invokeError } = await supabase.functions.invoke('proxy-api', {
+              body: {
+                url: url,
+                method: powerToExecute.method,
+                headers: powerToExecute.headers,
+                body: powerToExecute.body,
+              },
+            });
+
+            const content = invokeError ? JSON.stringify({ error: invokeError.message }) : JSON.stringify(toolResult);
+            toolOutputs.push({
+              tool_call_id: toolCall.id,
+              role: 'tool' as const,
+              name: functionName,
+              content: content,
+            });
+          }
         }
-      });
-    } catch (error) {
-      showError("Erro ao comunicar com a API OpenAI.");
+
+        // Segunda chamada para a OpenAI com os resultados da ferramenta
+        console.log("[Orchestrator] Enviando resultados dos poderes para a IA.");
+        const historyWithToolResults = [...historyWithToolCall, ...toolOutputs];
+        setMessageHistory(historyWithToolResults);
+
+        const secondResponse = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${openAiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: historyWithToolResults,
+          }),
+        });
+
+        if (!secondResponse.ok) {
+          const errorData = await secondResponse.json();
+          throw new Error(`Erro OpenAI (2ª chamada): ${errorData.error?.message || secondResponse.statusText}`);
+        }
+
+        const secondData = await secondResponse.json();
+        const finalMessage = secondData.choices?.[0]?.message?.content;
+        
+        console.log("[Orchestrator] Resposta final da IA:", finalMessage);
+        setAiResponse(finalMessage);
+        setMessageHistory(prev => [...prev, { role: 'assistant', content: finalMessage }]);
+        await speak(finalMessage, () => {
+          if (activated) startListening();
+        });
+
+      } else {
+        // Resposta direta sem usar ferramentas
+        const assistantMessage = responseMessage.content;
+        console.log("[Orchestrator] Resposta direta da IA:", assistantMessage);
+        setAiResponse(assistantMessage);
+        setMessageHistory(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+        await speak(assistantMessage, () => {
+          if (activated) startListening();
+        });
+      }
+    } catch (error: any) {
+      showError(error.message);
       setAiResponse("");
-      console.error("[VoiceAssistant] Erro na comunicação com a API OpenAI:", error);
-      startListening(); // Reinicia a escuta em caso de erro de rede
+      console.error("[Orchestrator] Erro no fluxo da conversa:", error);
+      startListening();
     }
   };
 
-  // Efeito para inicializar o reconhecimento de voz e síntese
   useEffect(() => {
     const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -281,7 +388,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
 
     recognitionRef.current = new SpeechRecognitionConstructor();
-    recognitionRef.current.continuous = true; // Modo contínuo
+    recognitionRef.current.continuous = true;
     recognitionRef.current.interimResults = false;
     recognitionRef.current.lang = "pt-BR";
 
@@ -308,15 +415,14 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         if (currentTranscript.includes(activationPhrase.toLowerCase())) {
           setActivated(true);
           speak("Assistente ativado. Pode falar.", () => {
-            startListening(); // Reinicia a escuta após falar a ativação
+            startListening();
           });
         } else {
           console.log("[VoiceAssistant] Não ativado. Aguardando frase de ativação.");
         }
       } else {
-        // Ativado, processa input
-        stopListening(); // Para a escuta para processar e falar
-        processUserInput(currentTranscript);
+        stopListening();
+        runConversation(currentTranscript);
       }
     };
 
@@ -324,8 +430,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       isRecognitionActive.current = false;
       setIsListening(false);
       console.log("[VoiceAssistant] Reconhecimento finalizado");
-      // Se o assistente estiver ativo e não estiver falando, e o reconhecimento parou,
-      // ele deve ser reiniciado automaticamente para manter a fluidez.
       if (activated && !isSpeakingRef.current) {
         console.log("[VoiceAssistant] Reiniciando escuta via onend fallback.");
         startListening();
@@ -360,9 +464,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         clearTimeout(restartTimeoutRef.current);
       }
     };
-  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice]);
+  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice, powers]);
 
-  // Efeito para criar a conversa no Supabase e iniciar o assistente
   useEffect(() => {
     const initializeAssistant = async () => {
       if (!workspace?.id) {
@@ -370,7 +473,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         return;
       }
 
-      // Criar conversa se ainda não houver uma
       if (!conversationId) {
         const { data, error } = await supabase
           .from('conversations')
@@ -388,20 +490,19 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         setMessageHistory([]);
       }
 
-      // Checar permissão do microfone e iniciar saudação
       const micPermission = await checkMicrophonePermission();
       if (micPermission) {
         if (!initialGreetingSpoken) {
           speak(welcomeMessage, () => {
             setInitialGreetingSpoken(true);
-            startListening(); // Inicia a escuta após a mensagem de boas-vindas
+            startListening();
           });
         } else {
-          startListening(); // Se a saudação já foi falada, apenas inicia a escuta
+          startListening();
         }
       } else {
         speak("Por favor, habilite seu microfone para conversar comigo.", () => {
-          startListening(); // Tenta iniciar a escuta mesmo sem permissão, para que o usuário possa tentar novamente
+          startListening();
         });
       }
     };
