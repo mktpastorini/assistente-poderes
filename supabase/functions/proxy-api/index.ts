@@ -18,24 +18,29 @@ serve(async (req) => {
       throw new Error('URL and method are required in the payload.');
     }
 
+    // Create a new Headers object to avoid modifying the original
+    const outgoingHeaders = new Headers(headers || {});
+
+    // Add a standard User-Agent header if one isn't already provided.
+    // Many APIs block requests without a User-Agent, causing a 403 Forbidden error.
+    if (!outgoingHeaders.has('User-Agent')) {
+      outgoingHeaders.set('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
+    }
+
     const fetchOptions = {
       method,
-      headers: headers || {},
+      headers: outgoingHeaders,
       body: body ? JSON.stringify(body) : undefined,
     };
 
-    // Make the request to the target API
     const response = await fetch(url, fetchOptions);
     
-    // Read the response body ONCE as text
     const responseText = await response.text();
 
-    // Then, try to parse it as JSON
     let responseData;
     try {
       responseData = JSON.parse(responseText);
     } catch (e) {
-      // If it's not JSON, use the raw text
       responseData = responseText;
     }
 
