@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -54,18 +54,15 @@ const SettingsPage: React.FC = () => {
   const [loadingSettings, setLoadingSettings] = useState(true);
 
   const {
+    control,
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
     defaultValues,
   });
-
-  // Controlar valor do slider manualmente
-  const voiceSensitivity = watch("voice_sensitivity");
 
   useEffect(() => {
     if (!loading && workspace && workspace.id) {
@@ -173,17 +170,23 @@ const SettingsPage: React.FC = () => {
           <CardTitle>Modelo de IA</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select {...register("ai_model")}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o modelo de IA" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="openai-gpt4">OpenAI GPT-4</SelectItem>
-              <SelectItem value="openai-gpt3.5">OpenAI GPT-3.5</SelectItem>
-              <SelectItem value="gemini-pro">Gemini Pro (não implementado)</SelectItem>
-              <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="ai_model"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o modelo de IA" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai-gpt4">OpenAI GPT-4</SelectItem>
+                  <SelectItem value="openai-gpt3.5">OpenAI GPT-3.5</SelectItem>
+                  <SelectItem value="gemini-pro">Gemini Pro (não implementado)</SelectItem>
+                  <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
         </CardContent>
       </Card>
 
@@ -192,16 +195,22 @@ const SettingsPage: React.FC = () => {
           <CardTitle>Modelo de Voz</CardTitle>
         </CardHeader>
         <CardContent>
-          <Select {...register("voice_model")}>
-            <SelectTrigger>
-              <SelectValue placeholder="Selecione o modelo de voz" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="browser">Navegador (Web Speech API)</SelectItem>
-              <SelectItem value="openai-tts">OpenAI TTS</SelectItem>
-              <SelectItem value="gemini-tts">Gemini TTS (não implementado)</SelectItem>
-            </SelectContent>
-          </Select>
+          <Controller
+            control={control}
+            name="voice_model"
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o modelo de voz" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="browser">Navegador (Web Speech API)</SelectItem>
+                  <SelectItem value="openai-tts">OpenAI TTS</SelectItem>
+                  <SelectItem value="gemini-tts">Gemini TTS (não implementado)</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
         </CardContent>
       </Card>
 
@@ -210,12 +219,18 @@ const SettingsPage: React.FC = () => {
           <CardTitle>Sensibilidade do Microfone</CardTitle>
         </CardHeader>
         <CardContent>
-          <Slider
-            value={voiceSensitivity ?? 50}
-            onValueChange={(value) => setValue("voice_sensitivity", value)}
-            min={0}
-            max={100}
-            step={1}
+          <Controller
+            control={control}
+            name="voice_sensitivity"
+            render={({ field }) => (
+              <Slider
+                value={field.value ?? 50}
+                onValueChange={(value) => field.onChange(value)}
+                min={0}
+                max={100}
+                step={1}
+              />
+            )}
           />
           <p className="text-sm text-muted-foreground mt-1">
             Ajuste a sensibilidade do microfone (0 a 100)
