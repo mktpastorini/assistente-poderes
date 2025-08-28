@@ -224,8 +224,8 @@ const SettingsPage: React.FC = () => {
             name="voice_sensitivity"
             render={({ field }) => (
               <Slider
-                value={field.value ?? 50}
-                onValueChange={(value) => field.onChange(value)}
+                value={[field.value ?? 50]} // Corrigido: valor deve ser array de números
+                onValueChange={(value) => field.onChange(value[0])} // Extrai o número do array
                 min={0}
                 max={100}
                 step={1}
