@@ -15,7 +15,7 @@ interface VoiceAssistantProps {
   model?: string;
   conversationMemoryLength: number;
   voiceModel: "browser" | "openai-tts" | "gemini-tts";
-  openaiTtsVoice?: string; // Nova prop para voz OpenAI TTS
+  openaiTtsVoice?: string;
   activationPhrase: string;
 }
 
@@ -28,7 +28,7 @@ const OPENAI_TTS_API_URL = "https://api.openai.com/v1/audio/speech";
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
 
 const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
-  welcomeMessage = "Bem-vindo ao site! Estou ouvindo. Diga 'ativar' para começar a conversar.",
+  welcomeMessage = "Bem-vindo ao site! Diga 'ativar' para começar a conversar.",
   openAiApiKey,
   systemPrompt = "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
   assistantPrompt = "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
@@ -49,14 +49,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
   const [activated, setActivated] = useState(false);
 
-  const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
-  const isSpeakingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isRecognitionActive = useRef(false);
-  const isStartingRecognition = useRef(false);
-  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isRecognitionActive = useRef(false); // Ref para estado ativo do reconhecimento
+  const isSpeakingRef = useRef(false); // Ref para estado ativo da fala
 
+  // Verifica permissão do microfone
   const checkMicrophonePermission = async (): Promise<boolean> => {
     if (!navigator.permissions) return true;
     try {
@@ -67,132 +66,39 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  useEffect(() => {
-    const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-    if (SpeechRecognitionConstructor) {
-      recognitionRef.current = new SpeechRecognitionConstructor();
-      recognitionRef.current.continuous = false; // Para controlar manualmente o ciclo
-      recognitionRef.current.interimResults = false;
-      recognitionRef.current.lang = "pt-BR";
-
-      recognitionRef.current.onstart = () => {
-        isRecognitionActive.current = true;
-        setIsListening(true);
-        showSuccess("Estou ouvindo...");
-        console.log("[VoiceAssistant] Reconhecimento iniciado");
-      };
-
-      recognitionRef.current.onresult = (event) => {
-        const currentTranscript = event.results[0][0].transcript.trim().toLowerCase();
-        setTranscript(currentTranscript);
-        console.log("[VoiceAssistant] Reconhecido:", currentTranscript);
-
-        if (currentTranscript.includes("parar de falar")) {
-          stopListening();
-          stopSpeaking();
-          setActivated(false);
-          return;
-        }
-
-        if (!activated) {
-          if (currentTranscript.includes(activationPhrase.toLowerCase())) {
-            setActivated(true);
-            speak("Assistente ativado. Pode falar.");
-          } else {
-            // Não ativado, reinicia escuta para aguardar ativação
-            restartListening();
-          }
-        } else {
-          // Ativado, processa input
-          stopListening(); // Parar escuta explicitamente antes de processar
-          processUserInput(currentTranscript);
-        }
-      };
-
-      recognitionRef.current.onend = () => {
-        isRecognitionActive.current = false;
-        setIsListening(false);
-        console.log("[VoiceAssistant] Reconhecimento finalizado");
-        // Se ativado e não falando, reinicia escuta
-        if (assistantStarted && activated && !isSpeakingRef.current) {
-          restartListening();
-        }
-      };
-
-      recognitionRef.current.onerror = (event) => {
-        console.error("[VoiceAssistant] Erro de reconhecimento de fala:", event.error);
-        showError(`Erro de voz: ${event.error}`);
-        isRecognitionActive.current = false;
-        setIsListening(false);
-        if (assistantStarted && activated && !isSpeakingRef.current) {
-          restartListening();
-        }
-      };
-    } else {
-      showError("Seu navegador não suporta reconhecimento de fala.");
-    }
-
-    if ("speechSynthesis" in window) {
-      synthRef.current = window.speechSynthesis;
-    } else {
-      showError("Seu navegador não suporta síntese de fala.");
-    }
-
-    return () => {
-      stopListening();
-      stopSpeaking();
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (restartTimeoutRef.current) {
-        clearTimeout(restartTimeoutRef.current);
-      }
-    };
-  }, [assistantStarted, activated, activationPhrase]);
-
-  // Função para reiniciar escuta com delay para evitar conflitos
-  const restartListening = () => {
-    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
-    restartTimeoutRef.current = setTimeout(() => {
-      startListening();
-    }, 500);
-  };
-
   // Inicia escuta
   const startListening = () => {
-    if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
-      if (isStartingRecognition.current) return;
-      isStartingRecognition.current = true;
-      setTranscript("");
-      setAiResponse("");
+    if (recognitionRef.current && !isRecognitionActive.current && !isSpeakingRef.current) {
       try {
         recognitionRef.current.start();
-        isRecognitionActive.current = true;
-        setIsListening(true);
+        // isRecognitionActive.current e setIsListening(true) serão atualizados em onstart
+        setTranscript("");
+        setAiResponse("");
         console.log("[VoiceAssistant] Iniciando escuta");
       } catch (error) {
         if (error instanceof DOMException && error.name === "InvalidStateError") {
           console.warn("[VoiceAssistant] Reconhecimento já está ativo, ignorando erro.");
+          isRecognitionActive.current = true;
+          setIsListening(true);
         } else {
           console.error("[VoiceAssistant] Erro ao iniciar reconhecimento de voz:", error);
           showError("Erro ao iniciar reconhecimento de voz.");
         }
-      } finally {
-        isStartingRecognition.current = false;
       }
+    } else {
+      console.log("[VoiceAssistant] Não foi possível iniciar escuta. isRecognitionActive:", isRecognitionActive.current, "isSpeaking:", isSpeakingRef.current);
     }
   };
 
   // Para escuta
   const stopListening = () => {
-    if (recognitionRef.current && isListening) {
+    if (recognitionRef.current && isRecognitionActive.current) {
       recognitionRef.current.stop();
-      isRecognitionActive.current = false;
+      // isRecognitionActive.current e setIsListening(false) serão atualizados em onend
       console.log("[VoiceAssistant] Escuta parada");
+    } else {
+      console.log("[VoiceAssistant] Não foi possível parar escuta. isRecognitionActive:", isRecognitionActive.current);
     }
-    setIsListening(false);
   };
 
   // Para fala
@@ -206,35 +112,33 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
     setIsSpeaking(false);
     isSpeakingRef.current = false;
+    console.log("[VoiceAssistant] Fala parada");
   };
 
   // Fala texto com voz selecionada
   const speak = async (text: string) => {
     if (!text) return;
 
-    stopSpeaking();
+    stopSpeaking(); // Garante que qualquer fala anterior seja interrompida
 
     setIsSpeaking(true);
     isSpeakingRef.current = true;
+    console.log("[VoiceAssistant] Iniciando fala:", text);
 
     const onSpeechEnd = () => {
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       console.log("[VoiceAssistant] Fala finalizada");
-      // Reinicia escuta após falar
+      // Após a fala, se o assistente estiver ativo, reinicia a escuta
       if (assistantStarted && activated) {
-        restartListening();
+        startListening();
       }
     };
 
     const onSpeechError = (error: any) => {
-      if (error === "interrupted") {
-        onSpeechEnd();
-        return;
-      }
       console.error("[VoiceAssistant] Erro de síntese de fala:", error);
       showError(`Erro de fala: ${error}`);
-      onSpeechEnd();
+      onSpeechEnd(); // Chama onSpeechEnd mesmo em caso de erro para reiniciar a escuta
     };
 
     if (voiceModel === "browser" && synthRef.current) {
@@ -300,7 +204,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   // Processa input do usuário enviando para OpenAI e falando resposta
   const processUserInput = async (input: string) => {
-    console.log("[VoiceAssistant] openAiApiKey:", openAiApiKey); // Log para verificar a chave
+    console.log("[VoiceAssistant] openAiApiKey:", openAiApiKey);
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
       setAiResponse("Por favor, configure sua chave API OpenAI nas configurações.");
@@ -359,10 +263,99 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
+  // Inicializa reconhecimento de voz e síntese
+  useEffect(() => {
+    const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionConstructor) {
+      showError("Seu navegador não suporta reconhecimento de fala.");
+      return;
+    }
+
+    recognitionRef.current = new SpeechRecognitionConstructor();
+    recognitionRef.current.continuous = true; // Modo contínuo
+    recognitionRef.current.interimResults = false;
+    recognitionRef.current.lang = "pt-BR";
+
+    recognitionRef.current.onstart = () => {
+      isRecognitionActive.current = true;
+      setIsListening(true);
+      showSuccess("Estou ouvindo...");
+      console.log("[VoiceAssistant] Reconhecimento iniciado");
+    };
+
+    recognitionRef.current.onresult = (event) => {
+      const currentTranscript = event.results[event.results.length - 1][0].transcript.trim().toLowerCase();
+      setTranscript(currentTranscript);
+      console.log("[VoiceAssistant] Reconhecido:", currentTranscript);
+
+      if (currentTranscript.includes("parar de falar")) {
+        stopListening();
+        stopSpeaking();
+        setActivated(false);
+        return;
+      }
+
+      if (!activated) {
+        if (currentTranscript.includes(activationPhrase.toLowerCase())) {
+          setActivated(true);
+          speak("Assistente ativado. Pode falar.");
+        } else {
+          // Se não ativado e não é a frase de ativação, apenas continua escutando
+          console.log("[VoiceAssistant] Não ativado. Aguardando frase de ativação.");
+        }
+      } else {
+        // Ativado, processa input
+        stopListening(); // Para a escuta para processar e falar
+        processUserInput(currentTranscript);
+      }
+    };
+
+    recognitionRef.current.onend = () => {
+      isRecognitionActive.current = false;
+      setIsListening(false);
+      console.log("[VoiceAssistant] Reconhecimento finalizado");
+      // Se o assistente estiver ativo e não estiver falando, e o reconhecimento parou,
+      // ele deve ser reiniciado automaticamente para manter a fluidez.
+      // Isso é um fallback, pois a reinicialização principal ocorre após a fala.
+      if (assistantStarted && activated && !isSpeakingRef.current) {
+        console.log("[VoiceAssistant] Reiniciando escuta via onend fallback.");
+        startListening();
+      }
+    };
+
+    recognitionRef.current.onerror = (event) => {
+      console.error("[VoiceAssistant] Erro de reconhecimento de fala:", event.error);
+      showError(`Erro de voz: ${event.error}`);
+      isRecognitionActive.current = false;
+      setIsListening(false);
+      // Tentar reiniciar escuta em caso de erro, se assistente ativo e não falando
+      if (assistantStarted && activated && !isSpeakingRef.current) {
+        console.log("[VoiceAssistant] Reiniciando escuta após erro.");
+        startListening();
+      }
+    };
+
+    if ("speechSynthesis" in window) {
+      synthRef.current = window.speechSynthesis;
+    } else {
+      showError("Seu navegador não suporta síntese de fala.");
+    }
+
+    return () => {
+      stopListening();
+      stopSpeaking();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [assistantStarted, activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice]); // Adicionado dependências para useEffect
+
   // Inicia assistente
   const startAssistant = () => {
     setAssistantStarted(true);
-    setActivated(false);
+    setActivated(false); // Começa desativado, esperando a frase de ativação
     console.log("[VoiceAssistant] Assistente iniciado");
   };
 
@@ -419,14 +412,14 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           <div className="flex space-x-4">
             <Button
               onClick={startListening}
-              disabled={isListening || isSpeaking || activated}
+              disabled={isListening || isSpeaking} // Desabilita se já estiver escutando ou falando
               className="bg-pink-500 hover:bg-pink-600 text-white"
             >
               <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
             </Button>
             <Button
               onClick={stopListening}
-              disabled={!isListening || isSpeaking}
+              disabled={!isListening || isSpeaking} // Desabilita se não estiver escutando ou estiver falando
               variant="destructive"
               className="bg-red-600 hover:bg-red-700 text-white"
             >
