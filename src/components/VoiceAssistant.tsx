@@ -101,7 +101,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         setIsListening(false);
         // Reiniciar escuta automaticamente se assistente ativo e não falando
         if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
-          startListening();
+          try {
+            recognitionRef.current?.start();
+            setIsListening(true);
+          } catch (error) {
+            console.error("Erro ao reiniciar reconhecimento de voz:", error);
+          }
         }
       };
 
@@ -109,6 +114,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         console.error("Erro de reconhecimento de fala:", event.error);
         showError(`Erro de voz: ${event.error}`);
         setIsListening(false);
+        // Tentar reiniciar reconhecimento em caso de erro recoverable
+        if (assistantStarted && !isSpeakingRef.current) {
+          try {
+            recognitionRef.current?.start();
+            setIsListening(true);
+          } catch (error) {
+            console.error("Erro ao reiniciar reconhecimento após erro:", error);
+          }
+        }
       };
     } else {
       showError("Seu navegador não suporta reconhecimento de fala.");
@@ -157,7 +171,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       (async () => {
         const micPermission = await checkMicrophonePermission();
         if (micPermission) {
-          startListening();
+          try {
+            recognitionRef.current?.start();
+            setIsListening(true);
+          } catch (error) {
+            console.error("Erro ao iniciar reconhecimento de voz:", error);
+            showError("Erro ao iniciar reconhecimento de voz.");
+          }
         } else {
           speak("Por favor, habilite seu microfone para conversar comigo.");
         }
@@ -189,7 +209,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       if (assistantStarted && !isListening) {
-        startListening();
+        try {
+          recognitionRef.current?.start();
+          setIsListening(true);
+        } catch (error) {
+          console.error("Erro ao reiniciar reconhecimento após fala:", error);
+        }
       }
     };
 
