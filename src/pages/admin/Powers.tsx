@@ -266,12 +266,15 @@ const PowersPage: React.FC = () => {
             )}
             <div>
               <Label htmlFor="power-api-key">Chave de API para Autenticação (Opcional)</Label>
-              <Select onValueChange={(value) => setValue("api_key_id", value)} value={watch("api_key_id") || ""}>
+              <Select
+                onValueChange={(value) => setValue("api_key_id", value === "none" ? null : value)}
+                value={watch("api_key_id") || "none"} // Se null, exibe "none"
+              >
                 <SelectTrigger id="power-api-key">
                   <SelectValue placeholder="Nenhuma chave de API" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="none">Nenhuma</SelectItem> {/* Valor alterado para "none" */}
                   {apiKeys.map((key) => (
                     <SelectItem key={key.id} value={key.id}>
                       {key.label} ({key.provider})
