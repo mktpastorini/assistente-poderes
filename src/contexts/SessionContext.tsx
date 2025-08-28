@@ -70,18 +70,24 @@ export const SessionContextProvider: React.FC<{ children: React.ReactNode }> = (
         }
         lastUserIdRef.current = user.id;
 
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
+        try {
+          const { data: profileData, error: profileError, status } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
 
-        if (profileError && profileError.code !== 'PGRST116') {
-          console.error('Error fetching profile:', profileError);
-          showError('Erro ao carregar perfil.');
+          if (profileError) {
+            console.error('Error fetching profile:', profileError, 'Status:', status);
+            showError('Erro ao carregar perfil.');
+            setProfile(null);
+          } else {
+            setProfile(profileData);
+          }
+        } catch (err) {
+          console.error('Unexpected error fetching profile:', err);
+          showError('Erro inesperado ao carregar perfil.');
           setProfile(null);
-        } else {
-          setProfile(profileData);
         }
 
         const { data: workspaceData, error: workspaceError } = await supabase.rpc('create_workspace_for_user', {
