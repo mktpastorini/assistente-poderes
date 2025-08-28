@@ -34,10 +34,21 @@ serve(async (req) => {
       requestBody = {};
     }
 
+    // Garantir que requestBody é um objeto antes de desestruturar
+    if (typeof requestBody !== 'object' || requestBody === null) {
+      console.error('Edge Function: requestBody is not an object or is null:', requestBody);
+      return new Response(JSON.stringify({ error: 'Invalid request body structure.' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const { url, method, headers, body } = requestBody;
 
+    console.log('Edge Function: Destructured - url:', url, 'method:', method, 'headers:', headers, 'body:', body);
+
     if (!url || !method) {
-      console.error('Edge Function: URL or method missing in request body.');
+      console.error('Edge Function: URL or method missing in request body after destructuring.');
       return new Response(JSON.stringify({ error: 'URL and method are required.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -49,21 +60,26 @@ serve(async (req) => {
       headers: headers || {},
     };
 
-    if (body) {
+    // Apenas inclua o corpo para métodos que tipicamente o utilizam
+    const methodsWithBody = ['POST', 'PUT', 'PATCH'];
+    if (methodsWithBody.includes(method.toUpperCase()) && body) {
       fetchOptions.body = JSON.stringify(body);
+    } else if (methodsWithBody.includes(method.toUpperCase()) && !body) {
+      console.warn(`Edge Function: Method ${method} typically expects a body, but none was provided.`);
     }
+    // Para GET e DELETE, fetchOptions.body deve ser undefined, o que já é o padrão se não for definido acima.
 
     console.log('Edge Function: Making request to target URL:', url);
-    console.log('Edge Function: Fetch options:', fetchOptions);
+    console.log('Edge Function: Final fetch options:', fetchOptions);
 
     const response = await fetch(url, fetchOptions);
-    const responseText = await response.text(); // Get raw text first
+    const responseText = await response.text();
 
     let responseData;
     try {
       responseData = JSON.parse(responseText);
     } catch {
-      responseData = responseText; // If not JSON, keep as text
+      responseData = responseText;
     }
 
     const responseHeaders = Object.fromEntries(response.headers.entries());
@@ -79,13 +95,13 @@ serve(async (req) => {
       data: responseData,
       headers: responseHeaders,
     }), {
-      status: 200, // Always return 200 for the proxy itself, actual API status is in 'status' field
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
     console.error('Edge Function: Uncaught error during execution:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
+    return new Response(JSON.stringify({ error: error.message || 'Internal server error', stack: error.stack }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
