@@ -89,6 +89,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         if (currentTranscript.includes("parar de falar")) {
           stopListening();
           stopSpeaking();
+          setActivated(false);
           return;
         }
 
@@ -106,7 +107,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       recognitionRef.current.onend = () => {
         isRecognitionActive.current = false;
         setIsListening(false);
-        // Não reiniciar aqui para evitar conflito com fala
+        // Reiniciar escuta automaticamente se assistente estiver ativado e não estiver falando
+        if (assistantStarted && activated && !isSpeakingRef.current) {
+          restartTimeoutRef.current = setTimeout(() => {
+            startListening();
+          }, 300);
+        }
       };
 
       recognitionRef.current.onerror = (event) => {
@@ -114,6 +120,20 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         showError(`Erro de voz: ${event.error}`);
         isRecognitionActive.current = false;
         setIsListening(false);
+        // Tentar reiniciar escuta em caso de erro, se assistente ativo
+        if (assistantStarted && activated && !isSpeakingRef.current) {
+          restartTimeoutRef.current = setTimeout(() => {
+            try {
+              startListening();
+            } catch (error) {
+              if (error instanceof DOMException && error.name === "InvalidStateError") {
+                console.warn("Reconhecimento já está ativo, ignorando erro.");
+              } else {
+                console.error("Erro ao reiniciar reconhecimento após erro:", error);
+              }
+            }
+          }, 300);
+        }
       };
     } else {
       showError("Seu navegador não suporta reconhecimento de fala.");
@@ -197,10 +217,10 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       // Reiniciar escuta automaticamente após a fala da IA
-      if (assistantStarted) {
+      if (assistantStarted && activated) {
         restartTimeoutRef.current = setTimeout(() => {
           startListening();
-        }, 500);
+        }, 300);
       }
     };
 
