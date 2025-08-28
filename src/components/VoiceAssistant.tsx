@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Volume2, Mic, StopCircle, Play } from "lucide-react";
+import { Volume2, Mic, StopCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/contexts/SessionContext";
@@ -44,16 +44,17 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [aiResponse, setAiResponse] = useState("");
-  const [assistantStarted, setAssistantStarted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
   const [activated, setActivated] = useState(false);
+  const [initialGreetingSpoken, setInitialGreetingSpoken] = useState(false);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const isRecognitionActive = useRef(false); // Ref para estado ativo do reconhecimento
-  const isSpeakingRef = useRef(false); // Ref para estado ativo da fala
+  const isRecognitionActive = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Verifica permissão do microfone
   const checkMicrophonePermission = async (): Promise<boolean> => {
@@ -71,7 +72,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     if (recognitionRef.current && !isRecognitionActive.current && !isSpeakingRef.current) {
       try {
         recognitionRef.current.start();
-        // isRecognitionActive.current e setIsListening(true) serão atualizados em onstart
         setTranscript("");
         setAiResponse("");
         console.log("[VoiceAssistant] Iniciando escuta");
@@ -94,7 +94,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const stopListening = () => {
     if (recognitionRef.current && isRecognitionActive.current) {
       recognitionRef.current.stop();
-      // isRecognitionActive.current e setIsListening(false) serão atualizados em onend
       console.log("[VoiceAssistant] Escuta parada");
     } else {
       console.log("[VoiceAssistant] Não foi possível parar escuta. isRecognitionActive:", isRecognitionActive.current);
@@ -116,10 +115,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   };
 
   // Fala texto com voz selecionada
-  const speak = async (text: string) => {
-    if (!text) return;
+  const speak = async (text: string, onEndCallback?: () => void) => {
+    if (!text) {
+      onEndCallback?.();
+      return;
+    }
 
-    stopSpeaking(); // Garante que qualquer fala anterior seja interrompida
+    stopSpeaking();
 
     setIsSpeaking(true);
     isSpeakingRef.current = true;
@@ -129,16 +131,13 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       console.log("[VoiceAssistant] Fala finalizada");
-      // Após a fala, se o assistente estiver ativo, reinicia a escuta
-      if (assistantStarted && activated) {
-        startListening();
-      }
+      onEndCallback?.();
     };
 
     const onSpeechError = (error: any) => {
       console.error("[VoiceAssistant] Erro de síntese de fala:", error);
       showError(`Erro de fala: ${error}`);
-      onSpeechEnd(); // Chama onSpeechEnd mesmo em caso de erro para reiniciar a escuta
+      onSpeechEnd();
     };
 
     if (voiceModel === "browser" && synthRef.current) {
@@ -208,6 +207,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
       setAiResponse("Por favor, configure sua chave API OpenAI nas configurações.");
+      // Reinicia a escuta mesmo sem API Key para continuar o fluxo
+      startListening();
       return;
     }
 
@@ -240,6 +241,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         const errorData = await response.json();
         showError(`Erro OpenAI: ${errorData.error?.message || response.statusText}`);
         setAiResponse("");
+        startListening(); // Reinicia a escuta em caso de erro da API
         return;
       }
 
@@ -255,15 +257,21 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         { role: "assistant", content: assistantMessage },
       ]);
 
-      await speak(assistantMessage);
+      await speak(assistantMessage, () => {
+        // Após a fala da IA, se o assistente estiver ativo, reinicia a escuta
+        if (activated) {
+          startListening();
+        }
+      });
     } catch (error) {
       showError("Erro ao comunicar com a API OpenAI.");
       setAiResponse("");
       console.error("[VoiceAssistant] Erro na comunicação com a API OpenAI:", error);
+      startListening(); // Reinicia a escuta em caso de erro de rede
     }
   };
 
-  // Inicializa reconhecimento de voz e síntese
+  // Efeito para inicializar o reconhecimento de voz e síntese
   useEffect(() => {
     const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -299,9 +307,10 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       if (!activated) {
         if (currentTranscript.includes(activationPhrase.toLowerCase())) {
           setActivated(true);
-          speak("Assistente ativado. Pode falar.");
+          speak("Assistente ativado. Pode falar.", () => {
+            startListening(); // Reinicia a escuta após falar a ativação
+          });
         } else {
-          // Se não ativado e não é a frase de ativação, apenas continua escutando
           console.log("[VoiceAssistant] Não ativado. Aguardando frase de ativação.");
         }
       } else {
@@ -317,8 +326,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       console.log("[VoiceAssistant] Reconhecimento finalizado");
       // Se o assistente estiver ativo e não estiver falando, e o reconhecimento parou,
       // ele deve ser reiniciado automaticamente para manter a fluidez.
-      // Isso é um fallback, pois a reinicialização principal ocorre após a fala.
-      if (assistantStarted && activated && !isSpeakingRef.current) {
+      if (activated && !isSpeakingRef.current) {
         console.log("[VoiceAssistant] Reiniciando escuta via onend fallback.");
         startListening();
       }
@@ -329,8 +337,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       showError(`Erro de voz: ${event.error}`);
       isRecognitionActive.current = false;
       setIsListening(false);
-      // Tentar reiniciar escuta em caso de erro, se assistente ativo e não falando
-      if (assistantStarted && activated && !isSpeakingRef.current) {
+      if (activated && !isSpeakingRef.current) {
         console.log("[VoiceAssistant] Reiniciando escuta após erro.");
         startListening();
       }
@@ -349,29 +356,59 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         audioRef.current.pause();
         audioRef.current = null;
       }
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+      }
     };
-  }, [assistantStarted, activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice]); // Adicionado dependências para useEffect
+  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice]);
 
-  // Inicia assistente
-  const startAssistant = () => {
-    setAssistantStarted(true);
-    setActivated(false); // Começa desativado, esperando a frase de ativação
-    console.log("[VoiceAssistant] Assistente iniciado");
-  };
-
-  // Ao iniciar assistente, checa permissão e inicia escuta
+  // Efeito para criar a conversa no Supabase e iniciar o assistente
   useEffect(() => {
-    if (assistantStarted) {
-      (async () => {
-        const micPermission = await checkMicrophonePermission();
-        if (micPermission) {
-          startListening();
-        } else {
-          speak("Por favor, habilite seu microfone para conversar comigo.");
+    const initializeAssistant = async () => {
+      if (!workspace?.id) {
+        console.log("[VoiceAssistant] Workspace não disponível, aguardando...");
+        return;
+      }
+
+      // Criar conversa se ainda não houver uma
+      if (!conversationId) {
+        const { data, error } = await supabase
+          .from('conversations')
+          .insert({ workspace_id: workspace.id, channel: 'web', status: 'active' })
+          .select('id')
+          .single();
+
+        if (error) {
+          console.error("[VoiceAssistant] Erro ao criar conversa:", error);
+          showError("Erro ao iniciar nova conversa.");
+          setConversationId(null);
+          return;
         }
-      })();
-    }
-  }, [assistantStarted]);
+        setConversationId(data.id);
+        setMessageHistory([]);
+      }
+
+      // Checar permissão do microfone e iniciar saudação
+      const micPermission = await checkMicrophonePermission();
+      if (micPermission) {
+        if (!initialGreetingSpoken) {
+          speak(welcomeMessage, () => {
+            setInitialGreetingSpoken(true);
+            startListening(); // Inicia a escuta após a mensagem de boas-vindas
+          });
+        } else {
+          startListening(); // Se a saudação já foi falada, apenas inicia a escuta
+        }
+      } else {
+        speak("Por favor, habilite seu microfone para conversar comigo.", () => {
+          startListening(); // Tenta iniciar a escuta mesmo sem permissão, para que o usuário possa tentar novamente
+        });
+      }
+    };
+
+    initializeAssistant();
+  }, [workspace, conversationId, initialGreetingSpoken, welcomeMessage]);
+
 
   return (
     <div className="flex flex-col items-center justify-center p-6 space-y-6 bg-gradient-to-tr from-purple-900 via-indigo-900 to-blue-900 rounded-3xl shadow-2xl max-w-md w-full text-white font-sans select-none">
@@ -396,38 +433,28 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         </div>
       </div>
 
-      {!assistantStarted ? (
-        <Button
-          onClick={startAssistant}
-          variant="outline"
-          className="text-pink-400 border-pink-400 hover:bg-pink-400 hover:text-white transition"
-        >
-          <Play className="mr-2 h-5 w-5" /> Iniciar Assistente
-        </Button>
-      ) : (
-        <div className="flex flex-col items-center space-y-2">
-          <div className="text-center text-yellow-300 text-sm">
-            {activated ? "Assistente ativado. Pode falar." : `Diga "${activationPhrase}" para ativar o assistente.`}
-          </div>
-          <div className="flex space-x-4">
-            <Button
-              onClick={startListening}
-              disabled={isListening || isSpeaking} // Desabilita se já estiver escutando ou falando
-              className="bg-pink-500 hover:bg-pink-600 text-white"
-            >
-              <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
-            </Button>
-            <Button
-              onClick={stopListening}
-              disabled={!isListening || isSpeaking} // Desabilita se não estiver escutando ou estiver falando
-              variant="destructive"
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              <StopCircle className="mr-2 h-5 w-5" /> Parar Escuta
-            </Button>
-          </div>
+      <div className="flex flex-col items-center space-y-2">
+        <div className="text-center text-yellow-300 text-sm">
+          {activated ? "Assistente ativado. Pode falar." : `Diga "${activationPhrase}" para ativar o assistente.`}
         </div>
-      )}
+        <div className="flex space-x-4">
+          <Button
+            onClick={startListening}
+            disabled={isListening || isSpeaking}
+            className="bg-pink-500 hover:bg-pink-600 text-white"
+          >
+            <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
+          </Button>
+          <Button
+            onClick={stopListening}
+            disabled={!isListening || isSpeaking}
+            variant="destructive"
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            <StopCircle className="mr-2 h-5 w-5" /> Parar Escuta
+          </Button>
+        </div>
+      </div>
 
       <div className="w-full bg-black/30 rounded-lg p-4 max-h-48 overflow-y-auto space-y-3">
         {transcript && (

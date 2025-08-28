@@ -32,6 +32,7 @@ const settingsSchema = z.object({
   gemini_api_key: z.string().optional().nullable(),
   conversation_memory_length: z.number().min(0).max(10),
   activation_phrase: z.string().min(1, "Frase de ativação é obrigatória"),
+  welcome_message: z.string().optional().nullable(), // Novo campo
 });
 
 type SettingsFormData = z.infer<typeof settingsSchema>;
@@ -49,6 +50,7 @@ const defaultValues: SettingsFormData = {
   gemini_api_key: "",
   conversation_memory_length: 5,
   activation_phrase: "ativar",
+  welcome_message: "Bem-vindo ao site! Diga 'ativar' para começar a conversar.", // Valor padrão
 };
 
 // Lista corrigida de vozes OpenAI TTS válidas para o parâmetro 'voice' da API
@@ -108,6 +110,7 @@ const SettingsPage: React.FC = () => {
             setValue("gemini_api_key", data.gemini_api_key || defaultValues.gemini_api_key);
             setValue("conversation_memory_length", data.conversation_memory_length ?? defaultValues.conversation_memory_length);
             setValue("activation_phrase", data.activation_phrase || defaultValues.activation_phrase);
+            setValue("welcome_message", data.welcome_message || defaultValues.welcome_message); // Novo campo
           }
           setLoadingSettings(false);
         });
@@ -133,6 +136,7 @@ const SettingsPage: React.FC = () => {
         gemini_api_key: formData.gemini_api_key || null,
         conversation_memory_length: formData.conversation_memory_length,
         activation_phrase: formData.activation_phrase,
+        welcome_message: formData.welcome_message || null, // Novo campo
       },
       { onConflict: "workspace_id" }
     );
@@ -152,6 +156,22 @@ const SettingsPage: React.FC = () => {
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <h1 className="text-3xl font-bold">Configurações do Assistente IA</h1>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Mensagem de Boas-Vindas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            {...register("welcome_message")}
+            rows={2}
+            placeholder="Mensagem que o assistente falará ao iniciar"
+          />
+          {errors.welcome_message && (
+            <p className="text-destructive text-sm mt-1">{errors.welcome_message.message}</p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

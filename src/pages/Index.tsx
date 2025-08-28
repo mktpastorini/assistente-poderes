@@ -16,6 +16,7 @@ interface Settings {
   openai_tts_voice: string | null;
   conversation_memory_length: number;
   activation_phrase: string;
+  welcome_message: string | null; // Adicionado welcome_message
 }
 
 const Index = () => {
@@ -48,9 +49,21 @@ const Index = () => {
               openai_tts_voice: data.openai_tts_voice || "alloy",
               conversation_memory_length: data.conversation_memory_length ?? 5,
               activation_phrase: data.activation_phrase || "ativar",
+              welcome_message: data.welcome_message || "Bem-vindo ao site! Diga 'ativar' para começar a conversar.", // Usando valor padrão
             });
           } else {
-            setSettings(null);
+            // Se não houver configurações, usa os valores padrão
+            setSettings({
+              system_prompt: "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
+              assistant_prompt: "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
+              ai_model: "gpt-4o-mini",
+              voice_model: "browser",
+              openai_api_key: "",
+              openai_tts_voice: "alloy",
+              conversation_memory_length: 5,
+              activation_phrase: "ativar",
+              welcome_message: "Bem-vindo ao site! Diga 'ativar' para começar a conversar.",
+            });
           }
           setLoadingSettings(false);
         });
@@ -66,6 +79,7 @@ const Index = () => {
   }
 
   if (!settings) {
+    // Isso não deve acontecer com os valores padrão, mas é um fallback
     return (
       <div className="min-h-screen flex items-center justify-center">
         Nenhuma configuração encontrada para este workspace.
@@ -77,13 +91,14 @@ const Index = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-gray-100 p-4">
       <div className="flex-grow flex items-center justify-center">
         <VoiceAssistant
+          welcomeMessage={settings.welcome_message || "Bem-vindo ao site! Diga 'ativar' para começar a conversar."}
           openAiApiKey={settings.openai_api_key || ""}
           systemPrompt={settings.system_prompt}
           assistantPrompt={settings.assistant_prompt}
           model={settings.ai_model}
           conversationMemoryLength={settings.conversation_memory_length}
           voiceModel={settings.voice_model}
-          openaiTtsVoice={settings.openai_tts_voice || "alloy"} // Passando voz selecionada
+          openaiTtsVoice={settings.openai_tts_voice || "alloy"}
           activationPhrase={settings.activation_phrase}
         />
       </div>
