@@ -240,7 +240,7 @@ const PowersPage: React.FC = () => {
         body: parsedBody,
       };
 
-      // Pass the payload object directly. The Supabase client will stringify it.
+      // Pass the payload object directly. The Supabase client will handle stringifying it.
       const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', {
         body: payload,
       });

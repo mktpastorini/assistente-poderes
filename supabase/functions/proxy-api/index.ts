@@ -24,10 +24,20 @@ serve(async (req) => {
       body: body ? JSON.stringify(body) : undefined,
     };
 
+    // Make the request to the target API
     const response = await fetch(url, fetchOptions);
     
-    // Tenta processar como JSON, mas se falhar, retorna o texto bruto.
-    const responseData = await response.json().catch(async () => await response.text());
+    // Read the response body ONCE as text
+    const responseText = await response.text();
+
+    // Then, try to parse it as JSON
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      // If it's not JSON, use the raw text
+      responseData = responseText;
+    }
 
     return new Response(
       JSON.stringify({
@@ -46,7 +56,7 @@ serve(async (req) => {
     console.error('Edge Function Error:', error);
     const isJsonError = error instanceof SyntaxError;
     const status = isJsonError ? 400 : 500;
-    const message = isJsonError ? "Invalid JSON payload received." : error.message;
+    const message = isJsonError ? "Invalid JSON payload received from client." : error.message;
 
     return new Response(
       JSON.stringify({ error: message, stack: error.stack }),
