@@ -246,10 +246,26 @@ const PowersPage: React.FC = () => {
       });
 
       if (invokeError) {
-        // Extract detailed error message from the function's response
-        const errorContext = (invokeError as any).context || {};
-        const detailedError = errorContext.error || invokeError.message;
-        const errorStack = errorContext.stack || invokeError.stack;
+        let detailedError = invokeError.message;
+        let errorStack = (invokeError as any).stack;
+
+        // The actual error response from the Edge Function is in the 'context' property
+        if ((invokeError as any).context && typeof (invokeError as any).context.json === 'function') {
+          try {
+            const errorBody = await (invokeError as any).context.json();
+            detailedError = errorBody.error || detailedError;
+            errorStack = errorBody.stack || errorStack;
+          } catch (e) {
+            console.error("Could not parse JSON from Edge Function error response:", e);
+            try {
+              // If it's not JSON, try to get the raw text
+              const errorText = await (invokeError as any).context.text();
+              detailedError = errorText || detailedError;
+            } catch (textErr) {
+              console.error("Could not get text from Edge Function error response:", textErr);
+            }
+          }
+        }
 
         showError(`Erro da Edge Function: ${detailedError}`);
         setTestResult({
@@ -406,8 +422,7 @@ const PowersPage: React.FC = () => {
               </div>
             )}
             <p className="text-sm text-muted-foreground mt-4">
-              Nota: Este teste utiliza uma Edge Function do Supabase para contornar problemas de CORS.
-              Chaves de API criptografadas não são descriptografadas automaticamente por esta Edge Function proxy.
+              Nota: Este teste utiliza uma Edge Function do Supabase para contornar problemas de CORS. Chaves de API criptografadas não são descriptografadas automaticamente por esta Edge Function proxy.
             </p>
           </CardContent>
         </Card>
