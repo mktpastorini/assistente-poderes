@@ -49,6 +49,17 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isStartingRecognition = useRef(false);
 
+  // Função para verificar permissão do microfone
+  const checkMicrophonePermission = async (): Promise<boolean> => {
+    if (!navigator.permissions) return true; // Se não suportar API Permissions, assume true
+    try {
+      const status = await navigator.permissions.query({ name: "microphone" as PermissionName });
+      return status.state === "granted";
+    } catch {
+      return true; // Se erro, assume true para tentar iniciar
+    }
+  };
+
   useEffect(() => {
     const SpeechRecognitionConstructor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -79,7 +90,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
       recognitionRef.current.onend = () => {
         setIsListening(false);
-        // Reiniciar escuta somente se assistente ativo e não estiver falando
         if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
           startListening();
         }
@@ -108,6 +118,21 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         audioRef.current = null;
       }
     };
+  }, [assistantStarted]);
+
+  // Iniciar escuta automaticamente ao iniciar assistente
+  useEffect(() => {
+    if (assistantStarted) {
+      (async () => {
+        const micPermission = await checkMicrophonePermission();
+        if (micPermission) {
+          startListening();
+        } else {
+          // Se sem permissão, falar mensagem pedindo permissão
+          speak("Por favor, habilite seu microfone para conversar comigo.");
+        }
+      })();
+    }
   }, [assistantStarted]);
 
   const stopSpeaking = () => {
@@ -207,6 +232,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   const startListening = () => {
     if (recognitionRef.current && !isListening && !isSpeakingRef.current) {
+      if (isStartingRecognition.current) return; // Evita start concorrente
       isStartingRecognition.current = true;
       setTranscript("");
       setAiResponse("");
@@ -236,7 +262,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
 
     setAssistantStarted(true);
-    // Falar mensagem de boas-vindas e só iniciar escuta após terminar
     speak(welcomeMessage);
 
     const { data, error } = await supabase
