@@ -6,15 +6,21 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { url, method, headers, body } = await req.json();
+    console.log('Edge Function: Incoming request method:', req.method);
+    console.log('Edge Function: Incoming request headers:', req.headers);
+
+    const requestBody = await req.json();
+    console.log('Edge Function: Incoming request body:', requestBody);
+
+    const { url, method, headers, body } = requestBody;
 
     if (!url || !method) {
+      console.error('Edge Function: URL or method missing in request body.');
       return new Response(JSON.stringify({ error: 'URL and method are required.' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -30,6 +36,9 @@ serve(async (req) => {
       fetchOptions.body = JSON.stringify(body);
     }
 
+    console.log('Edge Function: Making request to target URL:', url);
+    console.log('Edge Function: Fetch options:', fetchOptions);
+
     const response = await fetch(url, fetchOptions);
     const responseText = await response.text(); // Get raw text first
 
@@ -41,6 +50,10 @@ serve(async (req) => {
     }
 
     const responseHeaders = Object.fromEntries(response.headers.entries());
+
+    console.log('Edge Function: Response from target API status:', response.status);
+    console.log('Edge Function: Response from target API headers:', responseHeaders);
+    console.log('Edge Function: Response from target API data:', responseData);
 
     return new Response(JSON.stringify({
       status: response.status,
@@ -54,7 +67,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Edge Function error:', error);
+    console.error('Edge Function: Error during execution:', error);
     return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

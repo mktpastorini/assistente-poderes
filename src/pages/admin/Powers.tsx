@@ -77,7 +77,8 @@ const PowersPage: React.FC = () => {
       description: "",
       method: "GET",
       url: "",
-      headers: '{"Content-Type": "application/json"}', // Default to JSON content type
+      // Removido o cabeçalho de Authorization padrão, pois timeapi.io não precisa e pode causar 403
+      headers: '{"Content-Type": "application/json"}', 
       body: "{}",
       api_key_id: null,
     },
@@ -242,6 +243,9 @@ const PowersPage: React.FC = () => {
           headers: parsedHeaders,
           body: parsedBody,
         },
+        headers: { // Explicitly set Content-Type for the invocation itself
+          'Content-Type': 'application/json',
+        },
       });
 
       if (invokeError) {
@@ -317,7 +321,7 @@ const PowersPage: React.FC = () => {
             </div>
             <div>
               <Label htmlFor="power-headers">Cabeçalhos (JSON)</Label>
-              <Textarea id="power-headers" placeholder='{"Content-Type": "application/json", "Authorization": "Bearer {{API_KEY}}"}' rows={3} {...register("headers")} />
+              <Textarea id="power-headers" placeholder='{"Content-Type": "application/json"}' rows={3} {...register("headers")} />
               {errors.headers && <p className="text-destructive text-sm mt-1">{errors.headers.message}</p>}
             </div>
             {(currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH") && (
