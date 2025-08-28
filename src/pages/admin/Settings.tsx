@@ -133,7 +133,133 @@ const SettingsPage: React.FC = () => {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <h1 className="text-3xl font-bold">Configurações do Assistente IA</h1>
 
-      {/* ... outros cards ... */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Prompt do Sistema</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            {...register("system_prompt")}
+            rows={3}
+            placeholder="Prompt do sistema para a IA"
+          />
+          {errors.system_prompt && (
+            <p className="text-destructive text-sm mt-1">{errors.system_prompt.message}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Prompt do Assistente</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Textarea
+            {...register("assistant_prompt")}
+            rows={3}
+            placeholder="Prompt do assistente para a IA"
+          />
+          {errors.assistant_prompt && (
+            <p className="text-destructive text-sm mt-1">{errors.assistant_prompt.message}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modelo de IA</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select {...register("ai_model")}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o modelo de IA" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="openai-gpt4">OpenAI GPT-4</SelectItem>
+              <SelectItem value="openai-gpt3.5">OpenAI GPT-3.5</SelectItem>
+              <SelectItem value="gemini-pro">Gemini Pro (não implementado)</SelectItem>
+              <SelectItem value="gpt-4o-mini">GPT-4o Mini</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modelo de Voz</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Select {...register("voice_model")}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o modelo de voz" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="browser">Navegador (Web Speech API)</SelectItem>
+              <SelectItem value="openai-tts">OpenAI TTS</SelectItem>
+              <SelectItem value="gemini-tts">Gemini TTS (não implementado)</SelectItem>
+            </SelectContent>
+          </Select>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Sensibilidade do Microfone</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Slider
+            {...register("voice_sensitivity")}
+            min={0}
+            max={100}
+            step={1}
+            defaultValue={50}
+          />
+          <p className="text-sm text-muted-foreground mt-1">
+            Ajuste a sensibilidade do microfone (0 a 100)
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Chave API OpenAI</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            {...register("openai_api_key")}
+            type="password"
+            placeholder="Sua chave API OpenAI"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Chave API Gemini</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            {...register("gemini_api_key")}
+            type="password"
+            placeholder="Sua chave API Gemini"
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Memória da Conversa</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Input
+            {...register("conversation_memory_length")}
+            type="number"
+            min={0}
+            max={10}
+            placeholder="Número de mensagens para lembrar"
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>
