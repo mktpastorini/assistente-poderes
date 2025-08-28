@@ -11,9 +11,10 @@ interface Settings {
   system_prompt: string;
   assistant_prompt: string;
   ai_model: string;
-  voice_model: "browser" | "openai-tts" | "gemini-tts"; // Adicionado voice_model
+  voice_model: "browser" | "openai-tts" | "gemini-tts";
   openai_api_key: string | null;
   conversation_memory_length: number;
+  activation_phrase: string;
 }
 
 const Index = () => {
@@ -41,9 +42,10 @@ const Index = () => {
               system_prompt: data.system_prompt || "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
               assistant_prompt: data.assistant_prompt || "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
               ai_model: data.ai_model || "gpt-4o-mini",
-              voice_model: data.voice_model || "browser", // Carregando voice_model
+              voice_model: data.voice_model || "browser",
               openai_api_key: data.openai_api_key || "",
               conversation_memory_length: data.conversation_memory_length ?? 5,
+              activation_phrase: data.activation_phrase || "ativar",
             });
           } else {
             setSettings(null);
@@ -78,7 +80,8 @@ const Index = () => {
           assistantPrompt={settings.assistant_prompt}
           model={settings.ai_model}
           conversationMemoryLength={settings.conversation_memory_length}
-          voiceModel={settings.voice_model} // Passando voice_model
+          voiceModel={settings.voice_model}
+          activationPhrase={settings.activation_phrase} // Passando prop nova
         />
       </div>
       <MadeWithDyad />

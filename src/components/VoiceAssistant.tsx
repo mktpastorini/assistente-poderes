@@ -15,6 +15,7 @@ interface VoiceAssistantProps {
   model?: string;
   conversationMemoryLength: number;
   voiceModel: "browser" | "openai-tts" | "gemini-tts";
+  activationPhrase: string; // Nova prop
 }
 
 const OPENAI_CHAT_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -33,6 +34,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   model = "gpt-4o-mini",
   conversationMemoryLength,
   voiceModel,
+  activationPhrase,
 }) => {
   const { workspace } = useSession();
   const [isListening, setIsListening] = useState(false);
@@ -42,6 +44,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [assistantStarted, setAssistantStarted] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [messageHistory, setMessageHistory] = useState<Message[]>([]);
+  const [activated, setActivated] = useState(false); // Se a palavra de ativação foi ouvida
 
   const recognitionRef = useRef<InstanceType<typeof SpeechRecognition> | null>(null);
   const synthRef = useRef<SpeechSynthesis | null>(null);
@@ -49,7 +52,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isStartingRecognition = useRef(false);
 
-  // Função para verificar permissão do microfone
   const checkMicrophonePermission = async (): Promise<boolean> => {
     if (!navigator.permissions) return true;
     try {
@@ -84,8 +86,19 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           return;
         }
 
-        stopListening();
-        processUserInput(currentTranscript);
+        if (!activated) {
+          // Verifica se a palavra/frase de ativação foi dita
+          if (currentTranscript.includes(activationPhrase.toLowerCase())) {
+            setActivated(true);
+            speak("Assistente ativado. Pode falar.");
+          } else {
+            // Ainda aguardando ativação, não processa
+            return;
+          }
+        } else {
+          stopListening();
+          processUserInput(currentTranscript);
+        }
       };
 
       recognitionRef.current.onend = () => {
@@ -118,9 +131,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         audioRef.current = null;
       }
     };
-  }, [assistantStarted]);
+  }, [assistantStarted, activated, activationPhrase]);
 
-  // Criar conversa automaticamente quando assistente iniciar e conversationId for null
   useEffect(() => {
     const createConversation = async () => {
       if (assistantStarted && !conversationId && workspace?.id) {
@@ -143,7 +155,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     createConversation();
   }, [assistantStarted, conversationId, workspace]);
 
-  // Iniciar escuta automaticamente após conversa criada e permissão do mic
   useEffect(() => {
     if (assistantStarted && conversationId) {
       (async () => {
@@ -279,6 +290,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
 
   const startAssistant = () => {
     setAssistantStarted(true);
+    setActivated(false); // Resetar ativação ao iniciar assistente
   };
 
   const fetchMessageHistory = async (currentConversationId: string, limit: number) => {
@@ -428,22 +440,27 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           <Play className="mr-2 h-5 w-5" /> Iniciar Assistente
         </Button>
       ) : (
-        <div className="flex space-x-4">
-          <Button
-            onClick={startListening}
-            disabled={isListening || isSpeaking}
-            className="bg-pink-500 hover:bg-pink-600 text-white"
-          >
-            <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
-          </Button>
-          <Button
-            onClick={stopListening}
-            disabled={!isListening || isSpeaking}
-            variant="destructive"
-            className="bg-red-600 hover:bg-red-700 text-white"
-          >
-            <StopCircle className="mr-2 h-5 w-5" /> Parar Escuta
-          </Button>
+        <div className="flex flex-col items-center space-y-2">
+          <div className="text-center text-sm text-yellow-300">
+            {activated ? "Assistente ativado. Pode falar." : `Diga "${activationPhrase}" para ativar o assistente.`}
+          </div>
+          <div className="flex space-x-4">
+            <Button
+              onClick={startListening}
+              disabled={isListening || isSpeaking}
+              className="bg-pink-500 hover:bg-pink-600 text-white"
+            >
+              <Mic className="mr-2 h-5 w-5" /> Iniciar Escuta
+            </Button>
+            <Button
+              onClick={stopListening}
+              disabled={!isListening || isSpeaking}
+              variant="destructive"
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              <StopCircle className="mr-2 h-5 w-5" /> Parar Escuta
+            </Button>
+          </div>
         </div>
       )}
 
