@@ -10,12 +10,29 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let requestBody;
   try {
     console.log('Edge Function: Incoming request method:', req.method);
     console.log('Edge Function: Incoming request headers:', req.headers);
 
-    const requestBody = await req.json();
-    console.log('Edge Function: Incoming request body:', requestBody);
+    // Tenta ler o corpo como JSON. Se falhar, tenta como texto para depuração.
+    try {
+      requestBody = await req.json();
+      console.log('Edge Function: Successfully parsed request body as JSON:', requestBody);
+    } catch (jsonError) {
+      const rawBody = await req.text(); // Tenta ler como texto para depuração
+      console.error('Edge Function: Error parsing request body as JSON. Raw body:', rawBody, 'Error:', jsonError);
+      // Se o corpo estiver vazio, pode ser um GET sem corpo, o que é normal.
+      // Se não estiver vazio e não for JSON, é um erro.
+      if (rawBody.trim() !== '') {
+        return new Response(JSON.stringify({ error: 'Invalid JSON in request body', details: jsonError.message, rawBody }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      // Se o corpo estiver vazio, assume que não há corpo para processar
+      requestBody = {};
+    }
 
     const { url, method, headers, body } = requestBody;
 
@@ -67,7 +84,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Edge Function: Error during execution:', error);
+    console.error('Edge Function: Uncaught error during execution:', error);
     return new Response(JSON.stringify({ error: error.message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
