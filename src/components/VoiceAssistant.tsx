@@ -50,6 +50,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const isSpeakingRef = useRef(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isRecognitionActive = useRef(false);
   const isStartingRecognition = useRef(false);
 
   const checkMicrophonePermission = async (): Promise<boolean> => {
@@ -72,6 +73,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       recognitionRef.current.lang = "pt-BR";
 
       recognitionRef.current.onstart = () => {
+        isRecognitionActive.current = true;
         setIsListening(true);
         showSuccess("Estou ouvindo...");
       };
@@ -98,29 +100,30 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       };
 
       recognitionRef.current.onend = () => {
+        isRecognitionActive.current = false;
         setIsListening(false);
         // Reiniciar escuta automaticamente se assistente ativo e não falando
         if (assistantStarted && !isSpeakingRef.current && !isStartingRecognition.current) {
-          try {
-            recognitionRef.current?.start();
-            setIsListening(true);
-          } catch (error) {
-            console.error("Erro ao reiniciar reconhecimento de voz:", error);
-          }
+          startListening();
         }
       };
 
       recognitionRef.current.onerror = (event) => {
         console.error("Erro de reconhecimento de fala:", event.error);
         showError(`Erro de voz: ${event.error}`);
+        isRecognitionActive.current = false;
         setIsListening(false);
         // Tentar reiniciar reconhecimento em caso de erro recoverable
         if (assistantStarted && !isSpeakingRef.current) {
           try {
-            recognitionRef.current?.start();
-            setIsListening(true);
+            startListening();
           } catch (error) {
-            console.error("Erro ao reiniciar reconhecimento após erro:", error);
+            if (error instanceof DOMException && error.name === "InvalidStateError") {
+              // Já está rodando, ignorar
+              console.warn("Reconhecimento já está ativo, ignorando erro.");
+            } else {
+              console.error("Erro ao reiniciar reconhecimento após erro:", error);
+            }
           }
         }
       };
@@ -171,13 +174,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       (async () => {
         const micPermission = await checkMicrophonePermission();
         if (micPermission) {
-          try {
-            recognitionRef.current?.start();
-            setIsListening(true);
-          } catch (error) {
-            console.error("Erro ao iniciar reconhecimento de voz:", error);
-            showError("Erro ao iniciar reconhecimento de voz.");
-          }
+          startListening();
         } else {
           speak("Por favor, habilite seu microfone para conversar comigo.");
         }
@@ -209,12 +206,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       if (assistantStarted && !isListening) {
-        try {
-          recognitionRef.current?.start();
-          setIsListening(true);
-        } catch (error) {
-          console.error("Erro ao reiniciar reconhecimento após fala:", error);
-        }
+        startListening();
       }
     };
 
@@ -293,10 +285,16 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       setAiResponse("");
       try {
         recognitionRef.current.start();
+        isRecognitionActive.current = true;
         setIsListening(true);
       } catch (error) {
-        console.error("Erro ao iniciar reconhecimento de voz:", error);
-        showError("Erro ao iniciar reconhecimento de voz.");
+        if (error instanceof DOMException && error.name === "InvalidStateError") {
+          // Já está rodando, ignorar
+          console.warn("Reconhecimento já está ativo, ignorando erro.");
+        } else {
+          console.error("Erro ao iniciar reconhecimento de voz:", error);
+          showError("Erro ao iniciar reconhecimento de voz.");
+        }
       } finally {
         isStartingRecognition.current = false;
       }
@@ -306,6 +304,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const stopListening = () => {
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop();
+      isRecognitionActive.current = false;
     }
     setIsListening(false);
   };
