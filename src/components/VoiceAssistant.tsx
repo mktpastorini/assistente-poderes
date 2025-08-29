@@ -6,6 +6,7 @@ import { Volume2, Mic, StopCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/contexts/SessionContext";
+import { useSystem } from "@/contexts/SystemContext"; // Importar o novo hook
 
 interface VoiceAssistantProps {
   welcomeMessage?: string;
@@ -53,6 +54,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   activationPhrase,
 }) => {
   const { workspace } = useSession();
+  const { systemVariables, loadingSystemContext } = useSystem(); // Usar o SystemContext
 
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -231,6 +233,22 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
+  // Função para substituir placeholders na string
+  const replacePlaceholders = (text: string, variables: Record<string, any>): string => {
+    let result = text;
+    for (const key in variables) {
+      if (Object.prototype.hasOwnProperty.call(variables, key)) {
+        const placeholder = `{${key}}`;
+        const value = variables[key];
+        // Substitui apenas se o valor não for nulo/indefinido e for uma string ou número
+        if (value !== null && value !== undefined && (typeof value === 'string' || typeof value === 'number')) {
+          result = result.replace(new RegExp(placeholder, 'g'), String(value));
+        }
+      }
+    }
+    return result;
+  };
+
   // Orquestrador principal da conversa com a IA
   const runConversation = async (userInput: string) => {
     if (!openAiApiKey) {
@@ -305,17 +323,26 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
             console.log(`[Orchestrator] Executando poder: ${functionName} com args:`, functionArgs);
             
             let url = powerToExecute.url || '';
+            // Substituir placeholders na URL com systemVariables
+            url = replacePlaceholders(url, systemVariables);
+
             Object.keys(functionArgs).forEach(key => {
               const placeholder = `{${key}}`;
               url = url.replace(new RegExp(placeholder, 'g'), encodeURIComponent(functionArgs[key]));
             });
+
+            // Substituir placeholders no corpo com systemVariables
+            let body = powerToExecute.body;
+            if (body) {
+              body = JSON.parse(replacePlaceholders(JSON.stringify(body), systemVariables));
+            }
 
             const { data: toolResult, error: invokeError } = await supabase.functions.invoke('proxy-api', {
               body: {
                 url: url,
                 method: powerToExecute.method,
                 headers: powerToExecute.headers,
-                body: powerToExecute.body,
+                body: body,
               },
             });
 
@@ -464,12 +491,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         clearTimeout(restartTimeoutRef.current);
       }
     };
-  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice, powers]);
+  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice, powers, systemVariables]); // Adicionado systemVariables como dependência
 
   useEffect(() => {
     const initializeAssistant = async () => {
-      if (!workspace?.id) {
-        console.log("[VoiceAssistant] Workspace não disponível, aguardando...");
+      if (!workspace?.id || loadingSystemContext) { // Esperar o SystemContext carregar
+        console.log("[VoiceAssistant] Workspace ou SystemContext não disponível, aguardando...");
         return;
       }
 
@@ -508,8 +535,15 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     };
 
     initializeAssistant();
-  }, [workspace, conversationId, initialGreetingSpoken, welcomeMessage]);
+  }, [workspace, conversationId, initialGreetingSpoken, welcomeMessage, loadingSystemContext]); // Adicionado loadingSystemContext
 
+  if (loadingSystemContext) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Carregando automações do sistema...
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center justify-center p-6 space-y-6 bg-gradient-to-tr from-purple-900 via-indigo-900 to-blue-900 rounded-3xl shadow-2xl max-w-md w-full text-white font-sans select-none">

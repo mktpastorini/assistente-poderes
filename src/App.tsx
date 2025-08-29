@@ -9,8 +9,10 @@ import AdminLayout from "./layouts/AdminLayout";
 import SettingsPage from "./pages/admin/Settings";
 import PowersPage from "./pages/admin/Powers";
 import ConversationsPage from "./pages/admin/Conversations";
+import SystemPowersPage from "./pages/admin/SystemPowers"; // Importar a nova página
 import Login from "./pages/Login";
 import { SessionContextProvider, useSession } from "./contexts/SessionContext";
+import { SystemContextProvider } from "./contexts/SystemContext"; // Importar o novo contexto
 import React from "react";
 
 const queryClient = new QueryClient();
@@ -37,25 +39,28 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <SessionContextProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute>
-                  <AdminLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<SettingsPage />} /> {/* Default admin page */}
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="powers" element={<PowersPage />} />
-              <Route path="conversations" element={<ConversationsPage />} />
-            </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <SystemContextProvider> {/* Envolver com SystemContextProvider */}
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<SettingsPage />} /> {/* Default admin page */}
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="powers" element={<PowersPage />} />
+                <Route path="conversations" element={<ConversationsPage />} />
+                <Route path="system-powers" element={<SystemPowersPage />} /> {/* Nova rota */}
+              </Route>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </SystemContextProvider>
         </SessionContextProvider>
       </BrowserRouter>
     </TooltipProvider>
