@@ -2,7 +2,6 @@
 
 import { MadeWithDyad } from "@/components/made-with-dyad";
 import VoiceAssistant from "@/components/VoiceAssistant";
-import { useSession } from "@/contexts/SessionContext";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { showError } from "@/utils/toast";
@@ -16,61 +15,60 @@ interface Settings {
   openai_tts_voice: string | null;
   conversation_memory_length: number;
   activation_phrase: string;
-  welcome_message: string | null; // Adicionado welcome_message
+  welcome_message: string | null;
 }
 
 const Index = () => {
-  const { workspace, loading } = useSession();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
 
   useEffect(() => {
-    if (!loading && workspace && workspace.id) {
-      setLoadingSettings(true);
-      supabase
+    const fetchPublicSettings = async () => {
+      // Fetch the first available settings record, assuming it's the public one.
+      const { data, error } = await supabase
         .from("settings")
         .select("*")
-        .eq("workspace_id", workspace.id)
-        .single()
-        .then(({ data, error }) => {
-          if (error && error.code !== "PGRST116") {
-            showError("Erro ao carregar configurações.");
-            console.error(error);
-            setLoadingSettings(false);
-            return;
-          }
-          if (data) {
-            setSettings({
-              system_prompt: data.system_prompt || "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
-              assistant_prompt: data.assistant_prompt || "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
-              ai_model: data.ai_model || "gpt-4o-mini",
-              voice_model: data.voice_model || "browser",
-              openai_api_key: data.openai_api_key || "",
-              openai_tts_voice: data.openai_tts_voice || "alloy",
-              conversation_memory_length: data.conversation_memory_length ?? 5,
-              activation_phrase: data.activation_phrase || "ativar",
-              welcome_message: data.welcome_message || "Bem-vindo ao site! Diga 'ativar' para começar a conversar.", // Usando valor padrão
-            });
-          } else {
-            // Se não houver configurações, usa os valores padrão
-            setSettings({
-              system_prompt: "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
-              assistant_prompt: "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
-              ai_model: "gpt-4o-mini",
-              voice_model: "browser",
-              openai_api_key: "",
-              openai_tts_voice: "alloy",
-              conversation_memory_length: 5,
-              activation_phrase: "ativar",
-              welcome_message: "Bem-vindo ao site! Diga 'ativar' para começar a conversar.",
-            });
-          }
-          setLoadingSettings(false);
-        });
-    }
-  }, [workspace, loading]);
+        .limit(1)
+        .single();
 
-  if (loading || loadingSettings) {
+      if (error && error.code !== "PGRST116") { // PGRST116 means no rows found, which is not a critical error here
+        showError("Erro ao carregar configurações do assistente.");
+        console.error("Error fetching settings:", error);
+      }
+
+      if (data) {
+        setSettings({
+          system_prompt: data.system_prompt || "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
+          assistant_prompt: data.assistant_prompt || "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
+          ai_model: data.ai_model || "gpt-4o-mini",
+          voice_model: data.voice_model || "browser",
+          openai_api_key: data.openai_api_key || "",
+          openai_tts_voice: data.openai_tts_voice || "alloy",
+          conversation_memory_length: data.conversation_memory_length ?? 5,
+          activation_phrase: data.activation_phrase || "ativar",
+          welcome_message: data.welcome_message || "Bem-vindo ao site! Diga 'ativar' para começar a conversar.",
+        });
+      } else {
+        // If no settings are found in the database, use hardcoded default values.
+        setSettings({
+          system_prompt: "Você é Intra, a IA da Intratégica. Empresa de automações, desenvolvimento de IAs e sistemas.",
+          assistant_prompt: "Você é um assistente amigável e profissional que ajuda agências de tecnologia a automatizar processos e criar soluções de IA personalizadas.",
+          ai_model: "gpt-4o-mini",
+          voice_model: "browser",
+          openai_api_key: "",
+          openai_tts_voice: "alloy",
+          conversation_memory_length: 5,
+          activation_phrase: "ativar",
+          welcome_message: "Bem-vindo ao site! Diga 'ativar' para começar a conversar.",
+        });
+      }
+      setLoadingSettings(false);
+    };
+
+    fetchPublicSettings();
+  }, []); // Empty dependency array ensures this runs only once on mount.
+
+  if (loadingSettings) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         Carregando configurações do assistente...
@@ -79,10 +77,10 @@ const Index = () => {
   }
 
   if (!settings) {
-    // Isso não deve acontecer com os valores padrão, mas é um fallback
+    // This fallback is unlikely to be hit due to the default values, but it's good practice.
     return (
       <div className="min-h-screen flex items-center justify-center">
-        Nenhuma configuração encontrada para este workspace.
+        Não foi possível carregar as configurações do assistente.
       </div>
     );
   }

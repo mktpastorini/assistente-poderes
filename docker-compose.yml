@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  crm-app:
+  assistenteIA:
     image: node:18-alpine
     networks:
       - intrategica
@@ -9,12 +9,14 @@ services:
     volumes:
       - assistenteIA:/app
     environment:
-      NEXT_PUBLIC_SUPABASE_URL: 'https://mcnegecxqstyqlbcrhxp.supabase.co'
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbmVnZWN4cXN0eXFsYmNyaHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyNTIzNjcsImV4cCI6MjA3MTgyODM2N30.DShdQDIBdmpnorYtZvOM1boXyY61R78jdMrRJgGfmlk'
-      OPENAI_API_KEY: 'sua_chave_openai_aqui'
-      NODE_ENV: 'production'
-    command: |
-      sh -c "
+      - NEXT_PUBLIC_SUPABASE_URL=https://mcnegecxqstyqlbcrhxp.supabase.co
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbmVnZWN4cXN0eXFsYmNyaHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyNTIzNjcsImV4cCI6MjA3MTgyODM2N30.DShdQDIBdmpnorYtZvOM1boXyY61R78jdMrRJgGfmlk
+      - OPENAI_API_KEY=sua_chave_openai_aqui
+      - NODE_ENV=production
+    command:
+      - sh
+      - -c
+      - |
         apk add --no-cache git &&
         npm install -g pnpm &&
         echo 'Limpando diretório...' &&
@@ -23,42 +25,37 @@ services:
         echo 'Clonando repositório...' &&
         git clone --depth=1 https://github.com/mktpastorini/assistente-poderes.git . &&
         rm -rf .git &&
-        
-        echo '>>> Corrigindo vite.config.ts para permitir o host de produção...' &&
-        echo '
-import { defineConfig } from \"vite\";
-import dyadComponentTagger from \"@dyad-sh/react-vite-component-tagger\";
-import react from \"@vitejs/plugin-react-swc\";
-import path from \"path\";
-
-export default defineConfig(() => ({
-  server: {
-    host: \"::\",
-    port: 8080,
-  },
-  preview: {
-    host: \"::\",
-    port: 8080,
-    allowedHosts: [
-      \"assistenteia.intrategica.com.br\"
-    ],
-  },
-  plugins: [dyadComponentTagger(), react()],
-  resolve: {
-    alias: {
-      \"@\": path.resolve(__dirname, \"./src\"),
-    },
-  },
-}));
-        ' > vite.config.ts &&
-
+        echo 'Reescrevendo vite.config.ts...' &&
+        printf "%s\n" 'import { defineConfig } from "vite";' \
+        'import dyadComponentTagger from "@dyad-sh/react-vite-component-tagger";' \
+        'import react from "@vitejs/plugin-react-swc";' \
+        'import path from "path";' \
+        '' \
+        'export default defineConfig(() => ({' \
+        '  server: {' \
+        '    host: "::",' \
+        '    port: 8080,' \
+        '  },' \
+        '  preview: {' \
+        '    host: "::",' \
+        '    port: 8080,' \
+        '    allowedHosts: [' \
+        '      "assistenteia.intrategica.com.br"' \
+        '    ],' \
+        '  },' \
+        '  plugins: [dyadComponentTagger(), react()], ' \
+        '  resolve: { ' \
+        '    alias: { ' \
+        '      "@": path.resolve(__dirname, "./src"), ' \
+        '    }, ' \
+        '  }, ' \
+        '}));' > vite.config.ts &&
         echo 'Instalando dependências com pnpm...' &&
         pnpm install --frozen-lockfile &&
         echo 'Buildando aplicação para produção...' &&
         pnpm run build &&
         echo 'Iniciando servidor de produção...' &&
         pnpm preview --host 0.0.0.0 --port 8080
-      "
     deploy:
       mode: replicated
       replicas: 1
