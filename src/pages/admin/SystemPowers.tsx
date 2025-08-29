@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Trash2, Edit, Play, ToggleLeft, ToggleRight } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Play } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -65,7 +65,6 @@ const SystemPowersPage: React.FC = () => {
     setValue,
     watch,
     getValues,
-    control,
     formState: { errors, isSubmitting },
   } = useForm<SystemPowerFormData>({
     resolver: zodResolver(systemPowerSchema),
@@ -334,10 +333,11 @@ const SystemPowersPage: React.FC = () => {
                     <p className="text-sm text-muted-foreground">{power.description}</p>
                     <p className="text-xs text-muted-foreground">{power.method} {power.url}</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="icon" onClick={() => onToggleEnabled(power)}>
-                      {power.enabled ? <ToggleRight className="h-5 w-5 text-green-500" /> : <ToggleLeft className="h-5 w-5 text-gray-400" />}
-                    </Button>
+                  <div className="flex items-center space-x-4">
+                    <Switch
+                      checked={power.enabled}
+                      onCheckedChange={() => onToggleEnabled(power)}
+                    />
                     <Button variant="outline" size="sm" onClick={() => onEdit(power)}><Edit className="h-4 w-4" /></Button>
                     <Tooltip>
                       <TooltipTrigger asChild>
