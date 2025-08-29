@@ -1,6 +1,6 @@
 "use client";
 
-import { MadeWithDyad } from "@/components/made-with-dyad";
+import { Rodape } from "@/components/rodape";
 import VoiceAssistant from "@/components/VoiceAssistant";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,7 +100,7 @@ const Index = () => {
           activationPhrase={settings.activation_phrase}
         />
       </div>
-      <MadeWithDyad />
+      <Rodape />
     </div>
   );
 };
