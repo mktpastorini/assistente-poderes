@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from '@/contexts/SessionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
@@ -338,7 +339,25 @@ const SystemPowersPage: React.FC = () => {
                       {power.enabled ? <ToggleRight className="h-5 w-5 text-green-500" /> : <ToggleLeft className="h-5 w-5 text-gray-400" />}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => onEdit(power)}><Edit className="h-4 w-4" /></Button>
-                    <Button variant="destructive" size="sm" onClick={() => onDelete(power.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={0}>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => onDelete(power.id)}
+                            disabled={power.output_variable_name === 'ip_cliente'}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {power.output_variable_name === 'ip_cliente' && (
+                        <TooltipContent>
+                          <p>Este é um poder de sistema essencial e não pode ser excluído.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
                   </div>
                 </div>
               ))}
