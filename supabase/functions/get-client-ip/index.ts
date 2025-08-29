@@ -16,43 +16,58 @@ serve(async (req) => {
 
     // Log all potentially relevant IP headers for debugging
     console.log("[get-client-ip] --- Request Headers for IP Detection ---");
-    console.log(`[get-client-ip] cf-connecting-ip: ${headers.get('cf-connecting-ip')}`);
-    console.log(`[get-client-ip] x-forwarded-for: ${headers.get('x-forwarded-for')}`);
-    console.log(`[get-client-ip] x-real-ip: ${headers.get('x-real-ip')}`);
-    console.log(`[get-client-ip] x-client-ip: ${headers.get('x-client-ip')}`);
-    console.log(`[get-client-ip] remote-addr: ${headers.get('remote-addr')}`);
-    console.log(`[get-client-ip] x-vercel-forwarded-for: ${headers.get('x-vercel-forwarded-for')}`); // Common in Vercel
-    console.log(`[get-client-ip] --- End Request Headers ---`);
+    const headerNames = [
+      'x-vercel-forwarded-for',
+      'cf-connecting-ip',
+      'x-forwarded-for',
+      'x-real-ip',
+      'x-client-ip',
+      'remote-addr',
+    ];
+    headerNames.forEach(name => {
+      console.log(`[get-client-ip] ${name}: ${headers.get(name)}`);
+    });
+    console.log(`[get-client-ip] Request IP (Deno.Conn.remoteAddr): ${req.conn.remoteAddr.hostname}`);
+    console.log("[get-client-ip] --- End Request Headers ---");
 
+    const getFirstIp = (headerValue: string | null): string | null => {
+      if (!headerValue) return null;
+      const ips = headerValue.split(',').map(ip => ip.trim());
+      return ips[0] || null;
+    };
 
-    // Prioriza 'x-vercel-forwarded-for' se disponível (comum em ambientes Vercel)
-    const xVercelForwardedFor = headers.get('x-vercel-forwarded-for');
-    const cfConnectingIp = headers.get('cf-connecting-ip');
-    const xForwardedFor = headers.get('x-forwarded-for');
-    const xRealIp = headers.get('x-real-ip');
-    const xClientIp = headers.get('x-client-ip');
-    const remoteAddr = headers.get('remote-addr');
+    // Prioritized order for IP detection
+    const xVercelForwardedFor = getFirstIp(headers.get('x-vercel-forwarded-for'));
+    const cfConnectingIp = getFirstIp(headers.get('cf-connecting-ip'));
+    const xForwardedFor = getFirstIp(headers.get('x-forwarded-for'));
+    const xRealIp = getFirstIp(headers.get('x-real-ip'));
+    const xClientIp = getFirstIp(headers.get('x-client-ip'));
+    const remoteAddr = req.conn.remoteAddr.hostname; // Deno's direct connection IP
 
     if (xVercelForwardedFor) {
-      // x-vercel-forwarded-for pode ser uma lista separada por vírgulas, o primeiro é o cliente
-      clientIp = xVercelForwardedFor.split(',')[0].trim();
+      clientIp = xVercelForwardedFor;
+      console.log("[get-client-ip] Using x-vercel-forwarded-for");
     } else if (cfConnectingIp) {
-      // Se não, tenta 'cf-connecting-ip'
       clientIp = cfConnectingIp;
+      console.log("[get-client-ip] Using cf-connecting-ip");
     } else if (xForwardedFor) {
-      // Se não, tenta 'x-forwarded-for' e pega o primeiro IP da lista
-      clientIp = xForwardedFor.split(',')[0].trim();
+      clientIp = xForwardedFor;
+      console.log("[get-client-ip] Using x-forwarded-for");
     } else if (xRealIp) {
       clientIp = xRealIp;
+      console.log("[get-client-ip] Using x-real-ip");
     } else if (xClientIp) {
       clientIp = xClientIp;
+      console.log("[get-client-ip] Using x-client-ip");
     } else if (remoteAddr) {
       clientIp = remoteAddr;
+      console.log("[get-client-ip] Using Deno.Conn.remoteAddr");
     } else {
       clientIp = "Unknown";
+      console.log("[get-client-ip] No IP header found, defaulting to Unknown");
     }
 
-    console.log(`[get-client-ip] Detected Client IP: ${clientIp}`);
+    console.log(`[get-client-ip] Final Detected Client IP: ${clientIp}`);
 
     return new Response(
       JSON.stringify({ ip: clientIp }),
