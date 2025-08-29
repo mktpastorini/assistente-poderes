@@ -14,6 +14,9 @@ interface SystemContextType {
 
 const SystemContext = createContext<SystemContextType | undefined>(undefined);
 
+// URL da Edge Function get-client-ip
+const GET_CLIENT_IP_FUNCTION_URL = `https://mcnegecxqstyqlbcrhxp.supabase.co/functions/v1/get-client-ip`;
+
 export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { workspace, loading: sessionLoading } = useSession();
   const [systemVariables, setSystemVariables] = useState<Record<string, any>>({});
@@ -52,21 +55,36 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         try {
-          // 3. Substituir placeholders usando as variáveis já coletadas
-          const processedUrl = replacePlaceholders(power.url, newSystemVariables);
-          const processedHeadersStr = replacePlaceholders(JSON.stringify(power.headers || {}), newSystemVariables);
-          const processedBodyStr = replacePlaceholders(JSON.stringify(power.body || {}), newSystemVariables);
+          let data, invokeError;
+          const isGetClientIpPower = power.url === GET_CLIENT_IP_FUNCTION_URL;
 
-          const payload = {
-            url: processedUrl,
-            method: power.method,
-            headers: JSON.parse(processedHeadersStr),
-            body: JSON.parse(processedBodyStr),
-          };
+          if (isGetClientIpPower) {
+            // Invocar get-client-ip diretamente do cliente para obter o IP real do navegador
+            console.log(`[SystemContext] Directly invoking 'get-client-ip' for power '${power.name}'`);
+            const { data: ipData, error: ipError } = await supabase.functions.invoke('get-client-ip');
+            data = ipData;
+            invokeError = ipError;
+          } else {
+            // Para outros poderes, continuar usando proxy-api
+            // 3. Substituir placeholders usando as variáveis já coletadas
+            const processedUrl = replacePlaceholders(power.url, newSystemVariables);
+            const processedHeadersStr = replacePlaceholders(JSON.stringify(power.headers || {}), newSystemVariables);
+            const processedBodyStr = replacePlaceholders(JSON.stringify(power.body || {}), newSystemVariables);
 
-          console.log(`[SystemContext] Executando poder '${power.name}'. URL: ${payload.url}`); // Novo log
-          const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', { body: payload });
-          console.log(`[SystemContext] Resultado bruto para '${power.name}':`, { data, invokeError }); // Novo log
+            const payload = {
+              url: processedUrl,
+              method: power.method,
+              headers: JSON.parse(processedHeadersStr),
+              body: JSON.parse(processedBodyStr),
+            };
+
+            console.log(`[SystemContext] Executing power '${power.name}' via 'proxy-api'. URL: ${payload.url}`);
+            const { data: proxyData, error: proxyError } = await supabase.functions.invoke('proxy-api', { body: payload });
+            data = proxyData;
+            invokeError = proxyError;
+          }
+          
+          console.log(`[SystemContext] Resultado bruto para '${power.name}':`, { data, invokeError });
 
           if (invokeError) {
             console.error(`[SystemContext] Erro ao executar poder do sistema '${power.name}':`, invokeError);
