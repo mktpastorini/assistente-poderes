@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  crm-app:
+    image: node:18-alpine
+    restart: always
+    networks:
+      - intrategica
+    working_dir: /app
+    volumes:
+      - animesi:/app
+    
+    # --- IMPORTANTE: Substitua os valores abaixo pelas suas chaves reais ---
+    environment:
+      - NEXT_PUBLIC_SUPABASE_URL=https://mcnegecxqstyqlbcrhxp.supabase.co
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbmVnZWN4cXN0eXFsYmNyaHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyNTIzNjcsImV4cCI6MjA3MTgyODM2N30.DShdQDIBdmpnorYtZvOM1boXyY61R78jdMrRJgGfmlk
+      - OPENAI_API_KEY=sua_chave_openai_aqui
+      # Adicione outras variáveis de ambiente aqui, se necessário
+      - NODE_ENV=production
+
+    command: >
+      sh -c "
+        apk add --no-cache git &&
+        npm install -g pnpm &&
+        echo 'Limpando diretório...' &&
+        rm -rf /app/* &&
+        rm -rf /app/.* 2>/dev/null || true &&
+        echo 'Clonando repositório...' &&
+        git clone --depth=1 https://github.com/pastoriniMatheus/anime-se-eventos-35.git . &&
+        rm -rf .git &&
+        echo 'Instalando dependências com pnpm...' &&
+        pnpm install --frozen-lockfile &&
+        echo 'Buildando aplicação para produção...' &&
+        pnpm run build &&
+        echo 'Iniciando servidor de produção...' &&
+        pnpm preview --host 0.0.0.0 --port 8080
+      "
+      
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.animesi.rule=Host(`animesi.intrategica.com.br`)"
+        - "traefik.http.routers.animesi.entrypoints=websecure"
+        - "traefik.http.routers.animesi.priority=1"
+        - "traefik.http.routers.animesi.service=animesi"
+        - "traefik.http.routers.animesi.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.animesi.loadbalancer.server.port=8080"
+        - "traefik.http.services.animesi.loadbalancer.passHostHeader=true"
+
+volumes:
+  animesi:
+    external: true
+    name: animesi
+
+networks:
+  intrategica:
+    external: true
+    name: intrategica
