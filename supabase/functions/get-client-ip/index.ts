@@ -25,24 +25,31 @@ serve(async (req) => {
     console.log(`[get-client-ip] --- End Request Headers ---`);
 
 
-    // Prioriza 'cf-connecting-ip' se disponível (comum em ambientes Cloudflare)
+    // Prioriza 'x-vercel-forwarded-for' se disponível (comum em ambientes Vercel)
+    const xVercelForwardedFor = headers.get('x-vercel-forwarded-for');
     const cfConnectingIp = headers.get('cf-connecting-ip');
-    if (cfConnectingIp) {
+    const xForwardedFor = headers.get('x-forwarded-for');
+    const xRealIp = headers.get('x-real-ip');
+    const xClientIp = headers.get('x-client-ip');
+    const remoteAddr = headers.get('remote-addr');
+
+    if (xVercelForwardedFor) {
+      // x-vercel-forwarded-for pode ser uma lista separada por vírgulas, o primeiro é o cliente
+      clientIp = xVercelForwardedFor.split(',')[0].trim();
+    } else if (cfConnectingIp) {
+      // Se não, tenta 'cf-connecting-ip'
       clientIp = cfConnectingIp;
-    } else {
+    } else if (xForwardedFor) {
       // Se não, tenta 'x-forwarded-for' e pega o primeiro IP da lista
-      const xForwardedFor = headers.get('x-forwarded-for');
-      if (xForwardedFor) {
-        // x-forwarded-for pode ser uma lista separada por vírgulas, o primeiro é o cliente
-        clientIp = xForwardedFor.split(',')[0].trim();
-      } else {
-        // Fallback para outros cabeçalhos, se necessário
-        clientIp = headers.get('x-real-ip') || 
-                   headers.get('x-client-ip') || 
-                   headers.get('remote-addr') || 
-                   headers.get('x-vercel-forwarded-for') || // Added Vercel specific header
-                   "Unknown";
-      }
+      clientIp = xForwardedFor.split(',')[0].trim();
+    } else if (xRealIp) {
+      clientIp = xRealIp;
+    } else if (xClientIp) {
+      clientIp = xClientIp;
+    } else if (remoteAddr) {
+      clientIp = remoteAddr;
+    } else {
+      clientIp = "Unknown";
     }
 
     console.log(`[get-client-ip] Detected Client IP: ${clientIp}`);
