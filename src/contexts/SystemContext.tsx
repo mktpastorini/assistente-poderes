@@ -37,7 +37,7 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.error("Erro ao carregar poderes do sistema habilitados:", error);
+        console.error("[SystemContext] Erro ao carregar poderes do sistema habilitados:", error);
         showError("Erro ao carregar automações do sistema.");
         setLoadingSystemContext(false);
         return;
@@ -47,7 +47,7 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
       // 2. Executar poderes em um loop sequencial (for...of com await)
       for (const power of enabledPowers || []) {
         if (!power.url) {
-          console.warn(`Poder do sistema '${power.name}' não tem URL definida. Ignorando.`);
+          console.warn(`[SystemContext] Poder do sistema '${power.name}' não tem URL definida. Ignorando.`);
           continue;
         }
 
@@ -64,10 +64,12 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
             body: JSON.parse(processedBodyStr),
           };
 
+          console.log(`[SystemContext] Executando poder '${power.name}'. URL: ${payload.url}`); // Novo log
           const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', { body: payload });
+          console.log(`[SystemContext] Resultado bruto para '${power.name}':`, { data, invokeError }); // Novo log
 
           if (invokeError) {
-            console.error(`Erro ao executar poder do sistema '${power.name}':`, invokeError);
+            console.error(`[SystemContext] Erro ao executar poder do sistema '${power.name}':`, invokeError);
             showError(`Erro na automação '${power.name}'.`);
             newSystemVariables[power.output_variable_name] = { error: invokeError.message };
           } else {
@@ -75,15 +77,15 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
             newSystemVariables[power.output_variable_name] = data?.data || data;
           }
         } catch (execError: any) {
-          console.error(`Erro inesperado ao executar poder do sistema '${power.name}':`, execError);
+          console.error(`[SystemContext] Erro inesperado ao executar poder do sistema '${power.name}':`, execError);
           showError(`Erro inesperado na automação '${power.name}'.`);
           newSystemVariables[power.output_variable_name] = { error: execError.message };
         }
       }
       setSystemVariables(newSystemVariables);
-      console.log("[SystemContext] Final systemVariables:", newSystemVariables); // Added log
+      console.log("[SystemContext] Final systemVariables:", newSystemVariables);
     } catch (globalError: any) {
-      console.error("Erro global ao processar poderes do sistema:", globalError);
+      console.error("[SystemContext] Erro global ao processar poderes do sistema:", globalError);
       showError("Erro ao processar automações do sistema.");
     } finally {
       setLoadingSystemContext(false);

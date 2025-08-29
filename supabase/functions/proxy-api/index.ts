@@ -37,14 +37,17 @@ serve(async (req) => {
       body: (method.toUpperCase() !== 'GET' && body) ? JSON.stringify(body) : undefined,
     };
 
+    console.log(`[Proxy-API] Fetching URL: ${url} with method: ${method}`); // Novo log
     const response = await fetch(url, fetchOptions);
     
     const responseText = await response.text();
+    console.log(`[Proxy-API] Raw responseText from ${url}:`, responseText); // Novo log
 
     let responseData;
     try {
       responseData = JSON.parse(responseText);
     } catch (e) {
+      console.warn(`[Proxy-API] Could not parse response as JSON for ${url}. Treating as plain text. Error: ${e.message}`); // Novo log
       responseData = responseText;
     }
 
@@ -62,7 +65,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('Edge Function Error:', error);
+    console.error('[Proxy-API] Edge Function Error:', error);
     const isJsonError = error instanceof SyntaxError;
     const status = isJsonError ? 400 : 500;
     const message = isJsonError ? "Invalid JSON payload received from client." : error.message;
