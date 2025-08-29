@@ -59,11 +59,26 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
           const isGetClientIpPower = power.url === GET_CLIENT_IP_FUNCTION_URL;
 
           if (isGetClientIpPower) {
-            // Invocar get-client-ip diretamente do cliente para obter o IP real do navegador
-            console.log(`[SystemContext] Directly invoking 'get-client-ip' for power '${power.name}'`);
-            const { data: ipData, error: ipError } = await supabase.functions.invoke('get-client-ip');
-            data = ipData;
-            invokeError = ipError;
+            // Invocar get-client-ip diretamente do cliente usando fetch para obter o IP real do navegador
+            console.log(`[SystemContext] Directly fetching 'get-client-ip' for power '${power.name}'`);
+            try {
+              const response = await fetch(GET_CLIENT_IP_FUNCTION_URL, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+              });
+
+              if (!response.ok) {
+                const errorBody = await response.json();
+                throw new Error(`HTTP error! status: ${response.status}, message: ${errorBody.error || response.statusText}`);
+              }
+              data = await response.json();
+              invokeError = null; // No error
+            } catch (e: any) {
+              invokeError = e;
+              data = null;
+            }
           } else {
             // Para outros poderes, continuar usando proxy-api
             // 3. Substituir placeholders usando as variáveis já coletadas
