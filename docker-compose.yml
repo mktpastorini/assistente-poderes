@@ -3,22 +3,17 @@ version: '3.8'
 services:
   crm-app:
     image: node:18-alpine
-    restart: always
     networks:
       - intrategica
     working_dir: /app
     volumes:
-      - animesi:/app
-    
-    # --- IMPORTANTE: Substitua os valores abaixo pelas suas chaves reais ---
+      - assistenteIA:/app
     environment:
-      - NEXT_PUBLIC_SUPABASE_URL=https://mcnegecxqstyqlbcrhxp.supabase.co
-      - NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbmVnZWN4cXN0eXFsYmNyaHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyNTIzNjcsImV4cCI6MjA3MTgyODM2N30.DShdQDIBdmpnorYtZvOM1boXyY61R78jdMrRJgGfmlk
-      - OPENAI_API_KEY=sua_chave_openai_aqui
-      # Adicione outras variáveis de ambiente aqui, se necessário
-      - NODE_ENV=production
-
-    command: >
+      NEXT_PUBLIC_SUPABASE_URL: 'https://mcnegecxqstyqlbcrhxp.supabase.co'
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jbmVnZWN4cXN0eXFsYmNyaHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyNTIzNjcsImV4cCI6MjA3MTgyODM2N30.DShdQDIBdmpnorYtZvOM1boXyY61R78jdMrRJgGfmlk'
+      OPENAI_API_KEY: 'sua_chave_openai_aqui'
+      NODE_ENV: 'production'
+    command: |
       sh -c "
         apk add --no-cache git &&
         npm install -g pnpm &&
@@ -26,8 +21,37 @@ services:
         rm -rf /app/* &&
         rm -rf /app/.* 2>/dev/null || true &&
         echo 'Clonando repositório...' &&
-        git clone --depth=1 https://github.com/pastoriniMatheus/anime-se-eventos-35.git . &&
+        git clone --depth=1 https://github.com/mktpastorini/assistente-poderes.git . &&
         rm -rf .git &&
+        
+        echo '>>> Corrigindo vite.config.ts para permitir o host de produção...' &&
+        echo '
+import { defineConfig } from \"vite\";
+import dyadComponentTagger from \"@dyad-sh/react-vite-component-tagger\";
+import react from \"@vitejs/plugin-react-swc\";
+import path from \"path\";
+
+export default defineConfig(() => ({
+  server: {
+    host: \"::\",
+    port: 8080,
+  },
+  preview: {
+    host: \"::\",
+    port: 8080,
+    allowedHosts: [
+      \"assistenteia.intrategica.com.br\"
+    ],
+  },
+  plugins: [dyadComponentTagger(), react()],
+  resolve: {
+    alias: {
+      \"@\": path.resolve(__dirname, \"./src\"),
+    },
+  },
+}));
+        ' > vite.config.ts &&
+
         echo 'Instalando dependências com pnpm...' &&
         pnpm install --frozen-lockfile &&
         echo 'Buildando aplicação para produção...' &&
@@ -35,27 +59,27 @@ services:
         echo 'Iniciando servidor de produção...' &&
         pnpm preview --host 0.0.0.0 --port 8080
       "
-      
     deploy:
       mode: replicated
       replicas: 1
-      placement:
-        constraints:
-          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.animesi.rule=Host(`animesi.intrategica.com.br`)"
-        - "traefik.http.routers.animesi.entrypoints=websecure"
-        - "traefik.http.routers.animesi.priority=1"
-        - "traefik.http.routers.animesi.service=animesi"
-        - "traefik.http.routers.animesi.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.animesi.loadbalancer.server.port=8080"
-        - "traefik.http.services.animesi.loadbalancer.passHostHeader=true"
+        - "traefik.http.routers.assistenteia.rule=Host(`assistenteia.intrategica.com.br`)"
+        - "traefik.http.routers.assistenteia.entrypoints=websecure"
+        - "traefik.http.routers.assistenteia.priority=1"
+        - "traefik.http.routers.assistenteia.service=assistenteia"
+        - "traefik.http.routers.assistenteia.tls.certresolver=letsencryptresolver"
+        - "traefik.http.services.assistenteia.loadbalancer.server.port=8080"
+        - "traefik.http.services.assistenteia.loadbalancer.passHostHeader=true"
 
 volumes:
-  animesi:
+  assistenteIA:
     external: true
-    name: animesi
+    name: assistenteIA
 
 networks:
   intrategica:
