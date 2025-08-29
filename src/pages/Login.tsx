@@ -4,16 +4,16 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
-import { useRouter } from "next/router"; // Using next/router for pages directory
+import { useNavigate } from "react-router-dom"; // Usando useNavigate do react-router-dom
 
 const LoginPage = () => {
-  const router = useRouter();
+  const navigate = useNavigate(); // Usando useNavigate
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (session) {
-          router.push("/"); // Redirect to home if logged in
+          navigate("/"); // Redirecionar para a home se logado
         }
       }
     );
@@ -21,7 +21,7 @@ const LoginPage = () => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [navigate]); // Adicionar navigate como dependência
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-blue-950 to-purple-950 p-4">
