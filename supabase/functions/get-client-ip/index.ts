@@ -22,12 +22,12 @@ serve(async (req) => {
       'x-forwarded-for',
       'x-real-ip',
       'x-client-ip',
-      'remote-addr',
+      'remote-addr', // Keep logging, but won't be used for clientIp directly
     ];
     headerNames.forEach(name => {
       console.log(`[get-client-ip] ${name}: ${headers.get(name)}`);
     });
-    console.log(`[get-client-ip] Request IP (Deno.Conn.remoteAddr): ${req.conn.remoteAddr.hostname}`);
+    // Removed req.conn.remoteAddr.hostname as it's causing TypeError
     console.log("[get-client-ip] --- End Request Headers ---");
 
     const getFirstIp = (headerValue: string | null): string | null => {
@@ -36,13 +36,19 @@ serve(async (req) => {
       return ips[0] || null;
     };
 
+    const getLastIp = (headerValue: string | null): string | null => {
+      if (!headerValue) return null;
+      const ips = headerValue.split(',').map(ip => ip.trim());
+      return ips[ips.length - 1] || null;
+    };
+
     // Prioritized order for IP detection
     const xVercelForwardedFor = getFirstIp(headers.get('x-vercel-forwarded-for'));
     const cfConnectingIp = getFirstIp(headers.get('cf-connecting-ip'));
-    const xForwardedFor = getFirstIp(headers.get('x-forwarded-for'));
+    const xForwardedFor = getLastIp(headers.get('x-forwarded-for')); // Using getLastIp for x-forwarded-for
     const xRealIp = getFirstIp(headers.get('x-real-ip'));
     const xClientIp = getFirstIp(headers.get('x-client-ip'));
-    const remoteAddr = req.conn.remoteAddr.hostname; // Deno's direct connection IP
+    const remoteAddrHeader = getFirstIp(headers.get('remote-addr')); // Using getFirstIp for remote-addr header
 
     if (xVercelForwardedFor) {
       clientIp = xVercelForwardedFor;
@@ -52,16 +58,16 @@ serve(async (req) => {
       console.log("[get-client-ip] Using cf-connecting-ip");
     } else if (xForwardedFor) {
       clientIp = xForwardedFor;
-      console.log("[get-client-ip] Using x-forwarded-for");
+      console.log("[get-client-ip] Using x-forwarded-for (last IP)");
     } else if (xRealIp) {
       clientIp = xRealIp;
       console.log("[get-client-ip] Using x-real-ip");
     } else if (xClientIp) {
       clientIp = xClientIp;
       console.log("[get-client-ip] Using x-client-ip");
-    } else if (remoteAddr) {
-      clientIp = remoteAddr;
-      console.log("[get-client-ip] Using Deno.Conn.remoteAddr");
+    } else if (remoteAddrHeader) {
+      clientIp = remoteAddrHeader;
+      console.log("[get-client-ip] Using remote-addr header");
     } else {
       clientIp = "Unknown";
       console.log("[get-client-ip] No IP header found, defaulting to Unknown");
@@ -79,7 +85,7 @@ serve(async (req) => {
   } catch (error) {
     console.error('Edge Function Error (get-client-ip):', error);
     return new Response(
-      JSON.stringify({ error: error.message, ip: "Error" }),
+      JSON.stringify({ error: error.message, ip: "Error", stack: error.stack }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
