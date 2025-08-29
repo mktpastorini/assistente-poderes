@@ -6,7 +6,8 @@ import { Volume2, Mic, StopCircle } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/contexts/SessionContext";
-import { useSystem } from "@/contexts/SystemContext"; // Importar o novo hook
+import { useSystem } from "@/contexts/SystemContext";
+import { replacePlaceholders } from "@/lib/utils"; // Importar a função utilitária
 
 interface VoiceAssistantProps {
   welcomeMessage?: string;
@@ -54,7 +55,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   activationPhrase,
 }) => {
   const { workspace } = useSession();
-  const { systemVariables, loadingSystemContext } = useSystem(); // Usar o SystemContext
+  const { systemVariables, loadingSystemContext } = useSystem();
 
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -73,7 +74,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const isSpeakingRef = useRef(false);
   const restartTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Carrega os "Poderes" do workspace
   useEffect(() => {
     if (workspace?.id) {
       const fetchPowers = async () => {
@@ -233,23 +233,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }
   };
 
-  // Função para substituir placeholders na string
-  const replacePlaceholders = (text: string, variables: Record<string, any>): string => {
-    let result = text;
-    for (const key in variables) {
-      if (Object.prototype.hasOwnProperty.call(variables, key)) {
-        const placeholder = `{${key}}`;
-        const value = variables[key];
-        // Substitui apenas se o valor não for nulo/indefinido e for uma string ou número
-        if (value !== null && value !== undefined && (typeof value === 'string' || typeof value === 'number')) {
-          result = result.replace(new RegExp(placeholder, 'g'), String(value));
-        }
-      }
-    }
-    return result;
-  };
-
-  // Orquestrador principal da conversa com a IA
   const runConversation = async (userInput: string) => {
     if (!openAiApiKey) {
       showError("Chave API OpenAI não configurada.");
@@ -261,11 +244,9 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     console.log("[Orchestrator] Iniciando conversa com input:", userInput);
     setAiResponse("Processando...");
 
-    // Adiciona a mensagem do usuário ao histórico
     const newHistory = [...messageHistory, { role: "user" as const, content: userInput }];
     setMessageHistory(newHistory);
 
-    // Formata os "Poderes" para a API da OpenAI
     const tools = powers.map(power => ({
       type: 'function' as const,
       function: {
@@ -276,7 +257,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     }));
 
     try {
-      // Primeira chamada para a OpenAI
       const messagesForApi = [
         { role: "system" as const, content: systemPrompt },
         { role: "assistant" as const, content: assistantPrompt },
@@ -305,7 +285,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
       const data = await response.json();
       const responseMessage = data.choices?.[0]?.message;
 
-      // Se a IA decidir usar uma ferramenta (Poder)
       if (responseMessage.tool_calls) {
         setAiResponse("Executando poder...");
         console.log("[Orchestrator] IA solicitou o uso de poderes:", responseMessage.tool_calls);
@@ -322,16 +301,12 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           if (powerToExecute) {
             console.log(`[Orchestrator] Executando poder: ${functionName} com args:`, functionArgs);
             
-            let url = powerToExecute.url || '';
-            // Substituir placeholders na URL com systemVariables
-            url = replacePlaceholders(url, systemVariables);
-
+            let url = replacePlaceholders(powerToExecute.url || '', systemVariables);
             Object.keys(functionArgs).forEach(key => {
               const placeholder = `{${key}}`;
               url = url.replace(new RegExp(placeholder, 'g'), encodeURIComponent(functionArgs[key]));
             });
 
-            // Substituir placeholders no corpo com systemVariables
             let body = powerToExecute.body;
             if (body) {
               body = JSON.parse(replacePlaceholders(JSON.stringify(body), systemVariables));
@@ -356,7 +331,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
           }
         }
 
-        // Segunda chamada para a OpenAI com os resultados da ferramenta
         console.log("[Orchestrator] Enviando resultados dos poderes para a IA.");
         const historyWithToolResults = [...historyWithToolCall, ...toolOutputs];
         setMessageHistory(historyWithToolResults);
@@ -389,7 +363,6 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         });
 
       } else {
-        // Resposta direta sem usar ferramentas
         const assistantMessage = responseMessage.content;
         console.log("[Orchestrator] Resposta direta da IA:", assistantMessage);
         setAiResponse(assistantMessage);
@@ -491,11 +464,11 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
         clearTimeout(restartTimeoutRef.current);
       }
     };
-  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice, powers, systemVariables]); // Adicionado systemVariables como dependência
+  }, [activated, activationPhrase, openAiApiKey, systemPrompt, assistantPrompt, model, conversationMemoryLength, voiceModel, openaiTtsVoice, powers, systemVariables]);
 
   useEffect(() => {
     const initializeAssistant = async () => {
-      if (!workspace?.id || loadingSystemContext) { // Esperar o SystemContext carregar
+      if (!workspace?.id || loadingSystemContext) {
         console.log("[VoiceAssistant] Workspace ou SystemContext não disponível, aguardando...");
         return;
       }
@@ -535,7 +508,7 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
     };
 
     initializeAssistant();
-  }, [workspace, conversationId, initialGreetingSpoken, welcomeMessage, loadingSystemContext]); // Adicionado loadingSystemContext
+  }, [workspace, conversationId, initialGreetingSpoken, welcomeMessage, loadingSystemContext]);
 
   if (loadingSystemContext) {
     return (

@@ -20,8 +20,10 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSession } from '@/contexts/SessionContext';
+import { useSystem } from '@/contexts/SystemContext'; // Importar o hook do sistema
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { replacePlaceholders } from '@/lib/utils'; // Importar a função utilitária
 
 // Tipos para o Supabase
 interface Power {
@@ -66,6 +68,7 @@ type PowerFormData = z.infer<typeof powerSchema>;
 
 const PowersPage: React.FC = () => {
   const { workspace, loading: sessionLoading } = useSession();
+  const { systemVariables } = useSystem(); // Obter as variáveis do sistema
   const [powers, setPowers] = useState<Power[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loadingPowers, setLoadingPowers] = useState(true);
@@ -268,9 +271,16 @@ const PowersPage: React.FC = () => {
       return;
     }
     try {
-      const parsedHeaders = formData.headers ? JSON.parse(formData.headers) : {};
-      const parsedBody = (formData.body && (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH")) ? JSON.parse(formData.body) : undefined;
-      const payload = { url: formData.url, method: formData.method, headers: parsedHeaders, body: parsedBody };
+      // Substituir placeholders antes de enviar
+      const processedUrl = replacePlaceholders(formData.url || '', systemVariables);
+      const processedHeadersStr = replacePlaceholders(formData.headers || '{}', systemVariables);
+      const processedBodyStr = replacePlaceholders(formData.body || '{}', systemVariables);
+
+      const parsedHeaders = JSON.parse(processedHeadersStr);
+      const parsedBody = (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH") ? JSON.parse(processedBodyStr) : undefined;
+      
+      const payload = { url: processedUrl, method: formData.method, headers: parsedHeaders, body: parsedBody };
+      
       const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', { body: payload });
       if (invokeError) {
         let detailedError = invokeError.message;
