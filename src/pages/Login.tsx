@@ -4,10 +4,10 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // Usando useNavigate do react-router-dom
+import { useNavigate } from "react-router-dom"; // Fixed: Usando useNavigate do react-router-dom
 
 const LoginPage = () => {
-  const navigate = useNavigate(); // Usando useNavigate
+  const navigate = useNavigate(); // Fixed: Usando useNavigate
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -50,19 +50,19 @@ const LoginPage = () => {
                   defaultButtonText: "hsl(0 0% 100%)",
                   messageBackground: "hsl(220 20% 25%)",
                   messageText: "hsl(0 0% 90%)",
-                  anchorText: "hsl(210 100% 70%)",
-                  anchorTextHover: "hsl(270 100% 70%)",
+                  anchorTextColor: "hsl(210 100% 70%)", // Fixed: Changed to anchorTextColor
+                  anchorTextHoverColor: "hsl(270 100% 70%)", // Fixed: Changed to anchorTextHoverColor
                 },
                 fontSizes: {
                   baseButtonSize: "1rem",
                   baseInputSize: "1rem",
                   baseLabelSize: "0.9rem",
-                  baseLinkSize: "0.9rem",
+                  baseLinkFontSize: "0.9rem", // Fixed: Changed to baseLinkFontSize
                   baseMessageSize: "0.9rem",
                 },
                 radii: {
                   borderRadiusButton: "0.5rem",
-                  borderRadiusInput: "0.5rem",
+                  inputBorderRadius: "0.5rem", // Fixed: Changed to inputBorderRadius
                 },
               },
             },
