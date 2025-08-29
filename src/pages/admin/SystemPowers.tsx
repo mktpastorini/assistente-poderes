@@ -20,8 +20,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSession } from '@/contexts/SessionContext';
+import { useSystem } from '@/contexts/SystemContext'; // Importar o hook
 import { supabase } from '@/integrations/supabase/client';
 import { showError, showSuccess } from '@/utils/toast';
+import { replacePlaceholders } from '@/lib/utils'; // Importar a função
 
 interface SystemPower {
   id: string;
@@ -52,6 +54,7 @@ type SystemPowerFormData = z.infer<typeof systemPowerSchema>;
 
 const SystemPowersPage: React.FC = () => {
   const { workspace, loading: sessionLoading } = useSession();
+  const { systemVariables } = useSystem(); // Obter as variáveis do sistema
   const [systemPowers, setSystemPowers] = useState<SystemPower[]>([]);
   const [loadingSystemPowers, setLoadingSystemPowers] = useState(true);
   const [editingPowerId, setEditingPowerId] = useState<string | null>(null);
@@ -88,7 +91,8 @@ const SystemPowersPage: React.FC = () => {
     const { data, error } = await supabase
       .from('system_powers')
       .select('*')
-      .eq('workspace_id', workspace.id);
+      .eq('workspace_id', workspace.id)
+      .order('created_at', { ascending: true });
     if (error) {
       showError("Erro ao carregar poderes do sistema.");
       console.error(error);
@@ -142,7 +146,7 @@ const SystemPowersPage: React.FC = () => {
         reset();
         setEditingPowerId(null);
         setTestResult(null);
-        fetchSystemPowers(); // Recarrega a lista
+        fetchSystemPowers();
       }
     } catch (e: any) {
       showError(`Erro ao processar JSON: ${e.message}`);
@@ -203,9 +207,15 @@ const SystemPowersPage: React.FC = () => {
       return;
     }
     try {
-      const parsedHeaders = formData.headers ? JSON.parse(formData.headers) : {};
-      const parsedBody = (formData.body && (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH")) ? JSON.parse(formData.body) : undefined;
-      const payload = { url: formData.url, method: formData.method, headers: parsedHeaders, body: parsedBody };
+      // Substituir placeholders usando as variáveis do sistema já carregadas
+      const processedUrl = replacePlaceholders(formData.url || '', systemVariables);
+      const processedHeadersStr = replacePlaceholders(formData.headers || '{}', systemVariables);
+      const processedBodyStr = replacePlaceholders(formData.body || '{}', systemVariables);
+
+      const parsedHeaders = JSON.parse(processedHeadersStr);
+      const parsedBody = (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH") ? JSON.parse(processedBodyStr) : undefined;
+      
+      const payload = { url: processedUrl, method: formData.method, headers: parsedHeaders, body: parsedBody };
       
       const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', { body: payload });
       

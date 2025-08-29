@@ -4,17 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { showError } from '@/utils/toast';
 import { useSession } from './SessionContext';
-
-interface SystemPower {
-  id: string;
-  name: string;
-  method: string;
-  url: string | null;
-  headers: Record<string, string> | null;
-  body: Record<string, any> | null;
-  enabled: boolean;
-  output_variable_name: string;
-}
+import { replacePlaceholders } from '@/lib/utils'; // Importar a função
 
 interface SystemContextType {
   systemVariables: Record<string, any>;
@@ -38,11 +28,13 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
 
     setLoadingSystemContext(true);
     try {
+      // 1. Buscar poderes em ordem de criação para garantir execução sequencial
       const { data: enabledPowers, error } = await supabase
         .from('system_powers')
         .select('*')
         .eq('workspace_id', workspace.id)
-        .eq('enabled', true);
+        .eq('enabled', true)
+        .order('created_at', { ascending: true });
 
       if (error) {
         console.error("Erro ao carregar poderes do sistema habilitados:", error);
@@ -52,6 +44,7 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
       }
 
       const newSystemVariables: Record<string, any> = {};
+      // 2. Executar poderes em um loop sequencial (for...of com await)
       for (const power of enabledPowers || []) {
         if (!power.url) {
           console.warn(`Poder do sistema '${power.name}' não tem URL definida. Ignorando.`);
@@ -59,14 +52,18 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
         }
 
         try {
+          // 3. Substituir placeholders usando as variáveis já coletadas
+          const processedUrl = replacePlaceholders(power.url, newSystemVariables);
+          const processedHeadersStr = replacePlaceholders(JSON.stringify(power.headers || {}), newSystemVariables);
+          const processedBodyStr = replacePlaceholders(JSON.stringify(power.body || {}), newSystemVariables);
+
           const payload = {
-            url: power.url,
+            url: processedUrl,
             method: power.method,
-            headers: power.headers,
-            body: power.body,
+            headers: JSON.parse(processedHeadersStr),
+            body: JSON.parse(processedBodyStr),
           };
 
-          // Usar a Edge Function 'proxy-api' para executar a requisição
           const { data, error: invokeError } = await supabase.functions.invoke('proxy-api', { body: payload });
 
           if (invokeError) {
@@ -74,7 +71,7 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
             showError(`Erro na automação '${power.name}'.`);
             newSystemVariables[power.output_variable_name] = { error: invokeError.message };
           } else {
-            // Armazenar apenas a 'data' da resposta da proxy-api
+            // 4. Adicionar o resultado ao objeto de variáveis para o próximo poder usar
             newSystemVariables[power.output_variable_name] = data?.data || data;
           }
         } catch (execError: any) {
