@@ -81,6 +81,7 @@ export const SystemContextProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
       setSystemVariables(newSystemVariables);
+      console.log("[SystemContext] Final systemVariables:", newSystemVariables); // Added log
     } catch (globalError: any) {
       console.error("Erro global ao processar poderes do sistema:", globalError);
       showError("Erro ao processar automações do sistema.");

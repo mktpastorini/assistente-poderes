@@ -29,7 +29,7 @@ interface SystemPower {
   id: string;
   name: string;
   description: string | null;
-  method: string;
+  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
   url: string | null;
   headers: Record<string, string> | null;
   body: Record<string, any> | null;
@@ -158,6 +158,7 @@ const SystemPowersPage: React.FC = () => {
     setEditingPowerId(power.id);
     const formValues = {
       ...power,
+      method: power.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH",
       headers: JSON.stringify(power.headers || {}, null, 2),
       body: JSON.stringify(power.body || {}, null, 2),
     };
@@ -207,10 +208,13 @@ const SystemPowersPage: React.FC = () => {
       return;
     }
     try {
+      console.log("[SystemPowersPage] systemVariables before processing:", systemVariables); // Added log
       // Substituir placeholders usando as variáveis do sistema já carregadas
       const processedUrl = replacePlaceholders(formData.url || '', systemVariables);
       const processedHeadersStr = replacePlaceholders(formData.headers || '{}', systemVariables);
       const processedBodyStr = replacePlaceholders(formData.body || '{}', systemVariables);
+
+      console.log("[SystemPowersPage] Processed URL for test:", processedUrl); // Added log
 
       const parsedHeaders = JSON.parse(processedHeadersStr);
       const parsedBody = (currentMethod === "POST" || currentMethod === "PUT" || currentMethod === "PATCH") ? JSON.parse(processedBodyStr) : undefined;
