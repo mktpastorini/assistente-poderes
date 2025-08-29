@@ -57,7 +57,7 @@ const LoginPage = () => {
                   baseButtonSize: "1rem",
                   baseInputSize: "1rem",
                   baseLabelSize: "0.9rem",
-                  baseLinkFontSize: "0.9rem", // Fixed: Changed to baseLinkFontSize
+                  baseLinkSize: "0.9rem", // Fixed: Changed to baseLinkSize
                   baseMessageSize: "0.9rem",
                 },
                 radii: {

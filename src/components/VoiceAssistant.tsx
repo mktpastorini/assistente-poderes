@@ -67,8 +67,8 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const [initialGreetingSpoken, setInitialGreetingSpoken] = useState(false);
   const [powers, setPowers] = useState<Power[]>([]);
 
-  const recognitionRef = useRef<typeof SpeechRecognition | null>(null); // Fixed: typeof SpeechRecognition
-  const synthRef = useRef<typeof SpeechSynthesis | null>(null); // Fixed: typeof SpeechSynthesis
+  const recognitionRef = useRef<SpeechRecognition | null>(null); // Fixed: Changed to SpeechRecognition instance type
+  const synthRef = useRef<SpeechSynthesis | null>(null); // Fixed: Changed to SpeechSynthesis instance type
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const isRecognitionActive = useRef(false);
   const isSpeakingRef = useRef(false);
