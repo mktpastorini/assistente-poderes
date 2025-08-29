@@ -246,6 +246,23 @@ const SystemPowersPage: React.FC = () => {
       <h1 className="text-3xl font-bold">Poderes do Sistema</h1>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Como Usar</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            <strong>Poderes do Sistema</strong> são automações que rodam automaticamente sempre que a página principal do assistente é carregada. Os resultados são armazenados em variáveis que você pode usar nos <strong>Poderes do Assistente</strong> (na outra seção).
+          </p>
+          <p>
+            <strong>Como usar as variáveis:</strong> Para usar uma variável de saída (como <code>ip_cliente</code>) em um Poder do Assistente, basta usar o nome da variável entre chaves na URL, Cabeçalhos ou Corpo da requisição.
+          </p>
+          <p className="p-2 bg-gray-100 dark:bg-gray-800 rounded-md">
+            Exemplo: <code>https://api.exemplo.com/clima?ip={'{ip_cliente}'}</code>
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader><CardTitle>{editingPowerId ? "Editar Poder do Sistema" : "Adicionar Novo Poder do Sistema"}</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
