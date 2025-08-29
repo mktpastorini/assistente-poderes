@@ -29,7 +29,7 @@ interface SystemPower {
   id: string;
   name: string;
   description: string | null;
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; // Fixed: Use literal union type
+  method: string;
   url: string | null;
   headers: Record<string, string> | null;
   body: Record<string, any> | null;
@@ -158,7 +158,6 @@ const SystemPowersPage: React.FC = () => {
     setEditingPowerId(power.id);
     const formValues = {
       ...power,
-      method: power.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH", // Fixed: Cast method type
       headers: JSON.stringify(power.headers || {}, null, 2),
       body: JSON.stringify(power.body || {}, null, 2),
     };

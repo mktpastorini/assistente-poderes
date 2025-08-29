@@ -30,7 +30,7 @@ interface Power {
   id: string;
   name: string;
   description: string | null;
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"; // Fixed: Use literal union type
+  method: string;
   url: string | null;
   headers: Record<string, string> | null;
   body: Record<string, any> | null;
@@ -133,11 +133,6 @@ const PowersPage: React.FC = () => {
     }
   }, [formParameters, editorMode, setValue]);
 
-  interface SchemaProperty { // Fixed: Added interface for schema properties
-    type?: 'string' | 'number' | 'boolean';
-    description?: string;
-  }
-
   // Carregar poderes e chaves de API
   useEffect(() => {
     const fetchPowersAndApiKeys = async () => {
@@ -167,15 +162,12 @@ const PowersPage: React.FC = () => {
   const parseSchemaToFields = (schema: Record<string, any> | null) => {
     if (!schema || !schema.properties) return [];
     const requiredFields = new Set(schema.required || []);
-    return Object.entries(schema.properties).map(([name, props]) => {
-      const typedProps = props as SchemaProperty; // Fixed: Type assertion for props
-      return {
-        name,
-        type: typedProps.type || 'string',
-        description: typedProps.description || '',
-        required: requiredFields.has(name),
-      };
-    });
+    return Object.entries(schema.properties).map(([name, props]) => ({
+      name,
+      type: props.type || 'string',
+      description: props.description || '',
+      required: requiredFields.has(name),
+    }));
   };
 
   const handleTabChange = (newMode: 'form' | 'json') => {
@@ -242,7 +234,6 @@ const PowersPage: React.FC = () => {
     setEditingPowerId(power.id);
     const formValues = {
       ...power,
-      method: power.method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH", // Fixed: Cast method type
       headers: JSON.stringify(power.headers || {}, null, 2),
       body: JSON.stringify(power.body || {}, null, 2),
       parameters_schema: JSON.stringify(power.parameters_schema || {}, null, 2),
